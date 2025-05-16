@@ -13,11 +13,11 @@ class ArmActionClient : public rclcpp::Node {
     using RobotAction = moveit_action::action::RobotMove;
     using GoalHandleTest = rclcpp_action::ServerGoalHandle<RobotAction>;
 
-    explicit ArmActionClient(const rclcpp::NodeOptions &options) : Node("arm_action_client") {
+    explicit ArmActionClient(const rclcpp::NodeOptions &options = rclcpp::NodeOptions()) : Node("arm_action_client", options) {
         this->client_ptr_ = rclcpp_action::create_client<RobotAction>(this, "arm_action");
     }
 
-    void send_goal(geometry_msgs::Pose pose) {
+    void send_goal(geometry_msgs::msg::Pose pose) {
         // wait for server
         if (!this->client_ptr_->wait_for_action_server()) {
             RCLCPP_ERROR(this->get_logger(), "action server not available after waiting");
@@ -42,6 +42,17 @@ int main (int argc, char* argv[]) {
     rclcpp::init(argc, argv);
 
     auto client = std::make_shared<ArmActionClient>();
+
+    geometry_msgs::msg::Pose test_pose;
+    test_pose.position.x = 0.5;
+    test_pose.position.y = 0.5;
+    test_pose.position.z = 0.5;
+    test_pose.orientation.w = 1.0;
+
+    client->send_goal(test_pose);
+
+    rclcpp::spin(client);
+    rclcpp::shutdown();
 
     return 0;
 }

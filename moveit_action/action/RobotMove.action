@@ -7,4 +7,4 @@ string result
 
 ---
 # feedback
-float64 progress
+string progress

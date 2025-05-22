@@ -9,6 +9,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 find_package(geometric_shapes REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
 find_package(moveit_action REQUIRED)
@@ -31,6 +32,7 @@ ament_target_dependencies(action_server
   "rclcpp_action"
   "moveit_action"
   "geometry_msgs"
+  "tf2_geometry_msgs"
   "moveit_ros_planning_interface"
   "moveit_action"
 )
@@ -41,11 +43,13 @@ ament_target_dependencies(action_client
   "rclcpp_action"
   "moveit_action"
   "geometry_msgs"
+  "tf2_geometry_msgs"
 )
 
 
 install(TARGETS
   action_server
+  action_client
   DESTINATION lib/${PROJECT_NAME})
 
 ament_package()

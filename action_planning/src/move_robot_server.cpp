@@ -36,7 +36,8 @@ class ArmActionServer : public rclcpp::Node {
         std::thread([this]() {this->executor_.spin(); }).detach();
 
         // initialize interface; panda arm is the moveit demo robot 
-        move_group_interface_ = std::make_shared<MoveGroupInterface>(move_group_node_, "panda_arm");
+        arm_group_interface_ = std::make_shared<MoveGroupInterface>(move_group_node_, "panda_arm");
+        gripper_group_interface_ = std::make_shared<MoveGroupInterface>(move_group_node_, "hand");
 
         // initialize logger for output
         auto const logger = rclcpp::get_logger("action_server");
@@ -47,7 +48,8 @@ class ArmActionServer : public rclcpp::Node {
     rclcpp_action::Server<RobotAction>::SharedPtr action_server_;
     rclcpp::Node::SharedPtr move_group_node_;
     rclcpp::executors::SingleThreadedExecutor executor_;
-    std::shared_ptr<MoveGroupInterface> move_group_interface_;
+    std::shared_ptr<MoveGroupInterface> arm_group_interface_;
+    std::shared_ptr<MoveGroupInterface> gripper_group_interface_;
 
     // accept or reject the goal 
     rclcpp_action::GoalResponse goal_callback(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const RobotAction::Goal> goal) {
@@ -113,7 +115,7 @@ class ArmActionServer : public rclcpp::Node {
         pick_point.orientation = tf2::toMsg(end);
         waypoints.push_back(pick_point);
 
-        // place at target
+        // place at target -- currently set at a fixed position
         geometry_msgs::msg::Pose target_point;
         target_point.position.x = 0.5;
         target_point.position.y = -0.5;
@@ -125,7 +127,7 @@ class ArmActionServer : public rclcpp::Node {
         // set target pose
         // move_group_interface_->setPoseTarget(goal_pose->pose_goal);
 
-        double path_result = move_group_interface_->computeCartesianPath(waypoints, eef_step, jump, trajectory_plan);
+        double path_result = arm_group_interface_->computeCartesianPath(waypoints, eef_step, jump, trajectory_plan);
 
         // create plan to goal
         // MoveGroupInterface::Plan plan;
@@ -135,7 +137,7 @@ class ArmActionServer : public rclcpp::Node {
         if (path_result >= 0.0) {
             RCLCPP_INFO_ONCE(this->get_logger(), "\n[robot server: executing]\n");
 
-            move_group_interface_->execute(trajectory_plan);
+            arm_group_interface_->execute(trajectory_plan);
 
             // SEND RESULT
             result->result = "Execution success";

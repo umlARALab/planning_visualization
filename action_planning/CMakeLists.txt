@@ -47,6 +47,11 @@ ament_target_dependencies(action_client
 )
 
 
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}/
+)
+
 install(TARGETS
   action_server
   action_client

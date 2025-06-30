@@ -5,6 +5,8 @@
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 #include <geometry_msgs/msg/pose.hpp>
+#include <std_msgs/msg/color_rgba.hpp>
+#include <visualization_msgs/msg/marker_array.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 // #include <geometry_msgs/msg/twist.hpp>
@@ -30,6 +32,9 @@ class ArmActionServer : public rclcpp::Node {
             std::bind(&ArmActionServer::accept_goal, this, std::placeholders::_1)
         );
 
+        // initialize publisher to publish display trajectory
+        pub_ = this->create_publisher<visualization_msgs::msg::Marker>("action_trajectory_display", 10);
+
         // initialize move group node
         move_group_node_ = rclcpp::Node::make_shared("manipulator", options);
         executor_.add_node(move_group_node_);
@@ -50,6 +55,7 @@ class ArmActionServer : public rclcpp::Node {
     rclcpp::executors::SingleThreadedExecutor executor_;
     std::shared_ptr<MoveGroupInterface> arm_group_interface_;
     std::shared_ptr<MoveGroupInterface> gripper_group_interface_;
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr pub_;
 
     // accept or reject the goal 
     rclcpp_action::GoalResponse goal_callback(const rclcpp_action::GoalUUID &uuid, std::shared_ptr<const RobotAction::Goal> goal) {
@@ -85,6 +91,7 @@ class ArmActionServer : public rclcpp::Node {
         double eef_step = 0.01;
         double jump = 0.0;
         moveit_msgs::msg::RobotTrajectory trajectory_plan;
+        visualization_msgs::msg::Marker marker;
 
         tf2::Quaternion rot, start, end;
         start.setRPY(0.0, 0.0, 0.0);
@@ -95,6 +102,7 @@ class ArmActionServer : public rclcpp::Node {
         // GET REQUEST FROM GOALS
         const auto goal_pose = goal_handle->get_goal();
         auto result = std::make_shared<RobotAction::Result>();
+        // auto feedback = std::make_shared<RobotAction::Feedback>();
 
         // ADD WAYPOINTS
         // prepare to pick
@@ -122,6 +130,37 @@ class ArmActionServer : public rclcpp::Node {
         target_point.position.z = 0.25;
         target_point.orientation = tf2::toMsg(end);
         waypoints.push_back(target_point);
+
+        // DISPLAY TRAJECTORY
+        // create markers to display the trajectory
+        marker.header.frame_id = "panda_link0";
+        marker.ns = "path";
+        // marker.header.stamp = rclcpp::Time::now();
+
+        marker.action = visualization_msgs::msg::Marker::DELETEALL;
+
+        marker.type = visualization_msgs::msg::Marker::LINE_STRIP;
+        marker.action = visualization_msgs::msg::Marker::ADD;
+
+        marker.scale.x = 0.025;
+
+        std_msgs::msg::ColorRGBA c;
+        c.a = 1.0;
+        c.r = 1.0;
+        c.g = 0.0;
+        c.b = 0.0;
+
+        marker.lifetime = rclcpp::Duration::from_seconds(0);
+
+        marker.color = c;
+
+        for (geometry_msgs::msg::Pose p : waypoints) {
+            marker.points.push_back(p.position);
+            marker.colors.push_back(c);
+        }
+
+        // publish marker
+        pub_->publish(marker);
 
         // EXECUTE ACTION
         // set target pose
@@ -160,6 +199,7 @@ int main(int argc, char* argv[]) {
     auto server = std::make_shared<ArmActionServer>();
 
     rclcpp::spin(server);
+
     rclcpp::shutdown();
 
     return 0;

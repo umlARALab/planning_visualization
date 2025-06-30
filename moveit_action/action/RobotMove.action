@@ -7,4 +7,4 @@ string result
 
 ---
 # feedback
-string progress
+visualization_msgs/Marker traj

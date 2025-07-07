@@ -87,10 +87,9 @@ class ArmActionServer : public rclcpp::Node {
         RCLCPP_INFO_ONCE(this->get_logger(), "\n[robot server: planning]\n");
 
         // initialize container for list of waypoints
-        std::vector<geometry_msgs::msg::Pose> waypoints;
-        double eef_step = 0.01;
-        double jump = 0.0;
-        moveit_msgs::msg::RobotTrajectory trajectory_plan;
+        std::vector<geometry_msgs::msg::Pose> pre_waypoints;
+        std::vector<geometry_msgs::msg::Pose> post_waypoints;
+        std::vector<geometry_msgs::msg::Pose> complete_waypoints;
         visualization_msgs::msg::Marker marker;
 
         tf2::Quaternion rot, start, end;
@@ -109,19 +108,22 @@ class ArmActionServer : public rclcpp::Node {
         geometry_msgs::msg::Pose start_point = goal_pose->pose_goal;
         start_point.position.z += 0.1;
         start_point.orientation = tf2::toMsg(end);
-        waypoints.push_back(start_point);
+        pre_waypoints.push_back(start_point);
+        complete_waypoints.push_back(start_point);
 
         // lower to pick
         geometry_msgs::msg::Pose obj_point = start_point;
         obj_point.position.z -= 0.1;
         obj_point.orientation = tf2::toMsg(end);
-        waypoints.push_back(obj_point);
+        pre_waypoints.push_back(obj_point);
+        complete_waypoints.push_back(obj_point);
 
         // pick up
         geometry_msgs::msg::Pose pick_point = obj_point;
         pick_point.position.z += 0.1;
         pick_point.orientation = tf2::toMsg(end);
-        waypoints.push_back(pick_point);
+        post_waypoints.push_back(pick_point);
+        complete_waypoints.push_back(pick_point);
 
         // place at target -- currently set at a fixed position
         geometry_msgs::msg::Pose target_point;
@@ -129,7 +131,8 @@ class ArmActionServer : public rclcpp::Node {
         target_point.position.y = -0.5;
         target_point.position.z = 0.25;
         target_point.orientation = tf2::toMsg(end);
-        waypoints.push_back(target_point);
+        post_waypoints.push_back(target_point);
+        complete_waypoints.push_back(target_point);
 
         // DISPLAY TRAJECTORY
         // create markers to display the trajectory
@@ -154,7 +157,7 @@ class ArmActionServer : public rclcpp::Node {
 
         marker.color = c;
 
-        for (geometry_msgs::msg::Pose p : waypoints) {
+        for (geometry_msgs::msg::Pose p : complete_waypoints) {
             marker.points.push_back(p.position);
             marker.colors.push_back(c);
         }
@@ -166,27 +169,57 @@ class ArmActionServer : public rclcpp::Node {
         // set target pose
         // move_group_interface_->setPoseTarget(goal_pose->pose_goal);
 
-        double path_result = arm_group_interface_->computeCartesianPath(waypoints, eef_step, jump, trajectory_plan);
+        // double path_result = arm_group_interface_->computeCartesianPath(waypoints, eef_step, jump, trajectory_plan);
 
         // create plan to goal
         // MoveGroupInterface::Plan plan;
         // bool success = (move_group_interface_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
 
-        // execute plan
+        if (plan_and_execute(pre_waypoints, post_waypoints)) {
+            result->result = "Execution success";
+            goal_handle->succeed(result); 
+        } else {
+            RCLCPP_ERROR(this->get_logger(), "Planning failed");
+        }
+
+        // clear waypoints
+        pre_waypoints.clear();
+        post_waypoints.clear();
+        complete_waypoints.clear();
+    }
+
+    bool plan_and_execute(std::vector<geometry_msgs::msg::Pose> pre, std::vector<geometry_msgs::msg::Pose> post) {
+        double eef_step = 0.01;
+        double jump = 0.0;
+        moveit_msgs::msg::RobotTrajectory trajectory_plan;
+
+        double path_result = arm_group_interface_->computeCartesianPath(pre, eef_step, jump, trajectory_plan);
+
+        // execute pre pick up plan
         if (path_result >= 0.0) {
             RCLCPP_INFO_ONCE(this->get_logger(), "\n[robot server: executing]\n");
 
             arm_group_interface_->execute(trajectory_plan);
-
-            // SEND RESULT
-            result->result = "Execution success";
-            goal_handle->succeed(result); 
-            
         } else {
-            RCLCPP_ERROR(this->get_logger(), "Planning failed");
+            return false;
         }
-        // clear waypoints
-        waypoints.clear();
+
+        path_result = arm_group_interface_->computeCartesianPath(post, eef_step, jump, trajectory_plan);
+
+        rclcpp::sleep_for(std::chrono::seconds(3));
+
+        // execute pre pick up plan
+        if (path_result >= 0.0) {
+            RCLCPP_INFO_ONCE(this->get_logger(), "\n[robot server: executing]\n");
+
+            arm_group_interface_->execute(trajectory_plan);
+        } else {
+            return false;
+        }
+
+        rclcpp::sleep_for(std::chrono::seconds(5));
+
+        return true;
     }
 
     // void execute(const const std::shared_ptr<GoalHandleTest> goal_handle) {

@@ -44,6 +44,13 @@ class ArmActionServer : public rclcpp::Node {
         arm_group_interface_ = std::make_shared<MoveGroupInterface>(move_group_node_, "panda_arm");
         gripper_group_interface_ = std::make_shared<MoveGroupInterface>(move_group_node_, "hand");
 
+        gripper_model_group_ = gripper_group_interface_->getCurrentState()->getJointModelGroup("hand");
+        current_state_ = gripper_group_interface_->getCurrentState(10);
+        current_state_->copyJointGroupPositions(gripper_model_group_, gripper_group_positions_);
+
+        gripper_group_interface_->setStartStateToCurrentState();
+
+
         // initialize logger for output
         auto const logger = rclcpp::get_logger("action_server");
         RCLCPP_INFO_ONCE(this->get_logger(), "\n[robot server: starting]\n");
@@ -53,8 +60,14 @@ class ArmActionServer : public rclcpp::Node {
     rclcpp_action::Server<RobotAction>::SharedPtr action_server_;
     rclcpp::Node::SharedPtr move_group_node_;
     rclcpp::executors::SingleThreadedExecutor executor_;
+
     std::shared_ptr<MoveGroupInterface> arm_group_interface_;
     std::shared_ptr<MoveGroupInterface> gripper_group_interface_;
+    const moveit::core::JointModelGroup *gripper_model_group_;
+    std::vector<double> gripper_group_positions_;
+    moveit::core::RobotStatePtr current_state_;
+
+
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr pub_;
 
     // accept or reject the goal 
@@ -188,10 +201,45 @@ class ArmActionServer : public rclcpp::Node {
         complete_waypoints.clear();
     }
 
+    void open_gripper() {
+        MoveGroupInterface::Plan plan;
+        double success;
+        
+        gripper_group_positions_[0] = 0.035;
+        gripper_group_positions_[0] = 0.035;
+
+        gripper_group_interface_->setJointValueTarget(gripper_group_positions_);
+
+        success = (gripper_group_interface_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
+
+        if (success) {
+            gripper_group_interface_->execute(plan);
+        }
+    }
+
+    void close_gripper() {
+        MoveGroupInterface::Plan plan;
+        double success;
+        
+        gripper_group_positions_[0] = 0.01;
+        gripper_group_positions_[0] = 0.01;
+
+        gripper_group_interface_->setJointValueTarget(gripper_group_positions_);
+
+        success = (gripper_group_interface_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
+
+        if (success) {
+            gripper_group_interface_->execute(plan);
+        }
+    }
+
     bool plan_and_execute(std::vector<geometry_msgs::msg::Pose> pre, std::vector<geometry_msgs::msg::Pose> post) {
         double eef_step = 0.01;
         double jump = 0.0;
         moveit_msgs::msg::RobotTrajectory trajectory_plan;
+
+        open_gripper();
+        rclcpp::sleep_for(std::chrono::seconds(2));
 
         double path_result = arm_group_interface_->computeCartesianPath(pre, eef_step, jump, trajectory_plan);
 
@@ -204,9 +252,13 @@ class ArmActionServer : public rclcpp::Node {
             return false;
         }
 
-        path_result = arm_group_interface_->computeCartesianPath(post, eef_step, jump, trajectory_plan);
-
         rclcpp::sleep_for(std::chrono::seconds(3));
+
+        close_gripper();
+
+        rclcpp::sleep_for(std::chrono::seconds(2));
+
+        path_result = arm_group_interface_->computeCartesianPath(post, eef_step, jump, trajectory_plan);
 
         // execute pre pick up plan
         if (path_result >= 0.0) {

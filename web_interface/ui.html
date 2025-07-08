@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang = "en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Stretch Robot Web Control</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .row {
+            margin: 10px 0;
+        }
+
+        button {
+            padding: 15px 30px;
+            margin: 5px;
+            font-size: 18px;
+            cursor: pointer;
+        }
+        #stop {
+            background-color: red;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>Stretch Robot Control</h1>
+    <div class = "controls">
+        <div class = "row">
+            <button id="forward">Forward</button>
+        </div>
+        <div class = "row">
+            <button id="left">Left</button>
+            <button id="stop">Stop</button>
+            <button id="right">Right</button>
+        </div>
+        <div class = "row">
+            <button id="backward">Backward</button>
+        </div>
+    </div>
+    
+    <script>
+        //connect to ROS bridge 
+        const ros = ROSLIB.Ros({
+            url: 'ws://192.168.10.5//' //ROS systems IP address 
+        });
+
+        ros.on ('connection',() => {
+            console.log('Connected to ROS Bridge');
+        });
+
+        ros.on ('error',() => {
+            console.log('Error connecting to ROS Bridge:', error);
+        });
+
+        ros.on ('close',() => {
+            console.log('Disconnected from ROS Bridge.');
+        });
+
+        //a ros topic for publishing velocity commands
+        const cmdVel = new ROSLIB.Topic({
+            ros: ros,
+            name: '/turtle/cmd_vel',
+            messageType: 'geometry_msgs/Twist',
+        });
+
+        //function to send movement cmds 
+        function sendCommand(linear, angular){
+            const twist = new ROSLIB.Message({
+                linear: {x: linear, y: 0, z: 0},
+                angular: {x: 0, y: 0, z: angular},
+
+            });
+            cmdVel.publish(twist);
+        }
+
+        //event listeners for button 
+        document.getElementById('forward').onclick = () => sendCommand(1.0, 0.0);
+        document.getElementById('backward').onclick = () => sendCommand(-1.0, 0.0);
+        document.getElementById('left').onclick = () => sendCommand(0.0, 1.0);
+        document.getElementById('right').onclick = () => sendCommand(0.0, -1.0);
+        document.getElementById('stop').onclick = () => sendCommand(0.0, 0.0);
+    </script>
+</body>
+</html>

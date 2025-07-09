@@ -50,6 +50,12 @@ ament_target_dependencies(action_client
   "tf2_geometry_msgs"
 )
 
+add_executable(point_pub src/point_pub_test.cpp)
+ament_target_dependencies(point_pub
+  "rclcpp"
+  "geometry_msgs"
+)
+
 
 install(DIRECTORY
   launch
@@ -59,6 +65,7 @@ install(DIRECTORY
 install(TARGETS
   action_server
   action_client
+  point_pub
   DESTINATION lib/${PROJECT_NAME})
 
 ament_package()

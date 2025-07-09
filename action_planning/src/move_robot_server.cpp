@@ -14,6 +14,13 @@
 #include "moveit_action/action/robot_move.hpp"
 #include <moveit/move_group_interface/move_group_interface.h>
 
+/*
+
+This file contains the action server to plan and execute trajectories for the robot. It also displays the 
+trajectory using a marker publisher. 
+
+*/
+
 // action class
 class ArmActionServer : public rclcpp::Node {
  public:

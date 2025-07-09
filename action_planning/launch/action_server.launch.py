@@ -21,5 +21,10 @@ def generate_launch_description():
             package='action_planning',
             executable='action_server',
             name="action_server"
-        )
+        ),
+        # Node(
+        #     package='action_planning',
+        #     executable='point_pub',
+        #     name="point_pub"
+        # )
     ])

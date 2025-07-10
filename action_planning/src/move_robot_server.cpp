@@ -14,6 +14,13 @@
 #include "moveit_action/action/robot_move.hpp"
 #include <moveit/move_group_interface/move_group_interface.h>
 
+/*
+
+This file contains the action server to plan and execute trajectories for the robot. It also displays the 
+trajectory using a marker publisher. 
+
+*/
+
 // action class
 class ArmActionServer : public rclcpp::Node {
  public:
@@ -114,7 +121,11 @@ class ArmActionServer : public rclcpp::Node {
         // GET REQUEST FROM GOALS
         const auto goal_pose = goal_handle->get_goal();
         auto result = std::make_shared<RobotAction::Result>();
-        // auto feedback = std::make_shared<RobotAction::Feedback>();
+        auto feedback = std::make_shared<RobotAction::Feedback>();
+
+        // set feedback
+        feedback->set__is_execution_done(0);
+        goal_handle->publish_feedback(feedback);
 
         // ADD WAYPOINTS
         // prepare to pick
@@ -189,11 +200,14 @@ class ArmActionServer : public rclcpp::Node {
         // bool success = (move_group_interface_->plan(plan) == moveit::core::MoveItErrorCode::SUCCESS);
 
         if (plan_and_execute(pre_waypoints, post_waypoints)) {
-            result->result = "Execution success";
+            result->set__result("Execution success");
             goal_handle->succeed(result); 
+            feedback->set__is_execution_done(1);
         } else {
             RCLCPP_ERROR(this->get_logger(), "Planning failed");
         }
+
+        goal_handle->publish_feedback(feedback);
 
         // clear waypoints
         pre_waypoints.clear();
@@ -238,38 +252,38 @@ class ArmActionServer : public rclcpp::Node {
         double jump = 0.0;
         moveit_msgs::msg::RobotTrajectory trajectory_plan;
 
+        // make sure gripper is open
         open_gripper();
-        rclcpp::sleep_for(std::chrono::seconds(2));
+        rclcpp::sleep_for(std::chrono::seconds(1));
 
+
+        // plan and xecute pre pick up plan
         double path_result = arm_group_interface_->computeCartesianPath(pre, eef_step, jump, trajectory_plan);
-
-        // execute pre pick up plan
         if (path_result >= 0.0) {
             RCLCPP_INFO_ONCE(this->get_logger(), "\n[robot server: executing]\n");
-
             arm_group_interface_->execute(trajectory_plan);
         } else {
             return false;
         }
+        rclcpp::sleep_for(std::chrono::seconds(1));
 
-        rclcpp::sleep_for(std::chrono::seconds(3));
-
+        // grab object target
         close_gripper();
+        rclcpp::sleep_for(std::chrono::seconds(1));
 
-        rclcpp::sleep_for(std::chrono::seconds(2));
-
+        // plan and execute post pick up plan
         path_result = arm_group_interface_->computeCartesianPath(post, eef_step, jump, trajectory_plan);
-
-        // execute pre pick up plan
         if (path_result >= 0.0) {
             RCLCPP_INFO_ONCE(this->get_logger(), "\n[robot server: executing]\n");
-
             arm_group_interface_->execute(trajectory_plan);
         } else {
             return false;
         }
+        rclcpp::sleep_for(std::chrono::seconds(1));
 
-        rclcpp::sleep_for(std::chrono::seconds(5));
+        // release/drop object 
+        open_gripper();
+        rclcpp::sleep_for(std::chrono::seconds(3));
 
         return true;
     }

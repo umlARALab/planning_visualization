@@ -14,12 +14,22 @@ def generate_launch_description():
 
 
     return LaunchDescription([
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(moveit_demo_launch_file)
-        ),
+        # IncludeLaunchDescription(
+        #     PythonLaunchDescriptionSource(moveit_demo_launch_file)
+        # ),
         Node(
             package='action_planning',
             executable='action_server',
             name="action_server"
         )
+        # Node(
+        #     package='action_planning',
+        #     executable='action_client',
+        #     name="action_client"
+        # )
+        # Node(
+        #     package='action_planning',
+        #     executable='point_pub',
+        #     name="point_pub"
+        # )
     ])

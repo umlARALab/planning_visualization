@@ -254,7 +254,7 @@ class ArmActionServer : public rclcpp::Node {
 
         // make sure gripper is open
         open_gripper();
-        rclcpp::sleep_for(std::chrono::seconds(2));
+        rclcpp::sleep_for(std::chrono::seconds(1));
 
 
         // plan and xecute pre pick up plan
@@ -265,11 +265,11 @@ class ArmActionServer : public rclcpp::Node {
         } else {
             return false;
         }
-        rclcpp::sleep_for(std::chrono::seconds(3));
+        rclcpp::sleep_for(std::chrono::seconds(1));
 
         // grab object target
         close_gripper();
-        rclcpp::sleep_for(std::chrono::seconds(2));
+        rclcpp::sleep_for(std::chrono::seconds(1));
 
         // plan and execute post pick up plan
         path_result = arm_group_interface_->computeCartesianPath(post, eef_step, jump, trajectory_plan);
@@ -279,11 +279,11 @@ class ArmActionServer : public rclcpp::Node {
         } else {
             return false;
         }
-        rclcpp::sleep_for(std::chrono::seconds(3));
+        rclcpp::sleep_for(std::chrono::seconds(1));
 
         // release/drop object 
         open_gripper();
-        rclcpp::sleep_for(std::chrono::seconds(5));
+        rclcpp::sleep_for(std::chrono::seconds(3));
 
         return true;
     }

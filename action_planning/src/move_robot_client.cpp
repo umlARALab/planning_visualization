@@ -29,7 +29,7 @@ class ArmActionClient : public rclcpp::Node {
 
     explicit ArmActionClient(const rclcpp::NodeOptions &options = rclcpp::NodeOptions()) : Node("action_client", options) {
         this->client_ptr_ = rclcpp_action::create_client<RobotAction>(this, "arm_action");
-        point_sub_ = this->create_subscription<geometry_msgs::msg::Point>(
+        point_sub_ = this->create_subscription<geometry_msgs::msg::PointStamped>(
             topic_name, 10, std::bind(&ArmActionClient::topic_callback, this,std::placeholders::_1)
         );
 
@@ -83,20 +83,20 @@ class ArmActionClient : public rclcpp::Node {
 
  private:
     rclcpp_action::Client<RobotAction>::SharedPtr client_ptr_;
-    rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr point_sub_;
+    rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr point_sub_;
     geometry_msgs::msg::Point prev;
     // rclcpp_action::GoalStatus status;
 
-    void topic_callback(const geometry_msgs::msg::Point::SharedPtr msg) {
+    void topic_callback(const geometry_msgs::msg::PointStamped::SharedPtr msg) {
         geometry_msgs::msg::Pose target;
         std::string w;
 
         // check if its finding the same point as before
-        if (!(prev.x == msg->x && prev.y == msg->y && prev.z == msg->z)) {
-            RCLCPP_INFO(this->get_logger(), "\nGot point (%f, %f, %f). Plan and execute trajectory? (y/n)", msg->x, msg->y, msg->z);
+        if (!(prev.x == msg->point.x && prev.y == msg->point.y && prev.z == msg->point.z)) {
+            RCLCPP_INFO(this->get_logger(), "\nGot point (%f, %f, %f). Plan and execute trajectory? (y/n)", msg->point.x, msg->point.y, msg->point.z);
             std::getline(std::cin, w);
             if (strcmp(w.c_str(), "y") == 0 || strcmp(w.c_str(), "Y") == 0) {
-                target.position = *msg;
+                target.position = msg->point;
             
                 tf2::Quaternion rot, start, end;
                 start.setRPY(0.0, 0.0, 0.0);
@@ -107,15 +107,15 @@ class ArmActionClient : public rclcpp::Node {
 
                 send_goal(target);
 
-                rclcpp::sleep_for(std::chrono::seconds(10));
+                // rclcpp::sleep_for(std::chrono::seconds(10));
             } else {
                 RCLCPP_INFO(this->get_logger(), "Looking for next target...");
             }
         }
 
-        prev.x = msg->x;
-        prev.y = msg->y;
-        prev.z = msg->z;
+        prev.x = msg->point.x;
+        prev.y = msg->point.y;
+        prev.z = msg->point.z;
     }
 
 
@@ -143,7 +143,7 @@ class ArmActionClient : public rclcpp::Node {
         switch (result.code)
         {
         case rclcpp_action::ResultCode::SUCCEEDED:
-            RCLCPP_INFO(this->get_logger(), "Ready for next target!");
+            RCLCPP_INFO(this->get_logger(), "Looking for next target...");
             break;
         case rclcpp_action::ResultCode::ABORTED:
             RCLCPP_ERROR(this->get_logger(), "Goal aborted");

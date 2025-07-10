@@ -40,29 +40,40 @@ class ArmActionClient : public rclcpp::Node {
             RCLCPP_ERROR(this->get_logger(), "action server not available after waiting");
             rclcpp::shutdown();
         }
+        RCLCPP_INFO_ONCE(this->get_logger(), "Action server ready");
+
+        prev.x = NULL;
+        prev.y = NULL;
+        prev.z = NULL;
 
     }
 
-    void send_goal(geometry_msgs::msg::Pose pose) const {
-
-
+    void send_goal(geometry_msgs::msg::Pose pose) {
         // create goal
         auto goal_msg = RobotAction::Goal();
 
         // send goals to server one at a time; time out if it takes longer than a minute
-        RCLCPP_INFO(this->get_logger(), "Sending goal at point: (%f, %f, %f)", pose.position.x, pose.position.y, pose.position.z);
+        RCLCPP_INFO(this->get_logger(), "Sending goal point: (%f, %f, %f)", pose.position.x, pose.position.y, pose.position.z);
 
         // set goal
         goal_msg.pose_goal = pose;
 
         // send goal to server when it is ready
         if (!this->client_ptr_->wait_for_action_server(std::chrono::seconds(60))) {
-            RCLCPP_INFO(this->get_logger(), "[client] Action server not ready in time");
+            RCLCPP_INFO(this->get_logger(), "Action server not ready in time");
         }
 
-        RCLCPP_INFO(this->get_logger(), "[client] Action server ready");
+        // RCLCPP_INFO(this->get_logger(), "[client] Action server ready");
 
-        this->client_ptr_->async_send_goal(goal_msg);
+        // this->client_ptr_->async_send_goal(goal_msg);
+
+        auto send_goal_options = rclcpp_action::Client<RobotAction>::SendGoalOptions();
+        send_goal_options.goal_response_callback = std::bind(&ArmActionClient::goal_response_callback, this, std::placeholders::_1);
+        send_goal_options.feedback_callback = std::bind(&ArmActionClient::feedback_callback, this, std::placeholders::_1, std::placeholders::_2);
+        send_goal_options.result_callback = std::bind(&ArmActionClient::result_callback, this, std::placeholders::_1);
+
+        client_ptr_->async_send_goal(goal_msg, send_goal_options);
+        // RCLCPP_INFO(this->get_logger(), "[client] Action goal done");
 
         // auto goal_options = rclcpp_action::Client<RobotAction>::SendGoalOptions();
         // goal_options.goal_response_callback = std::bind(%ArmActionClient::goal)
@@ -73,71 +84,72 @@ class ArmActionClient : public rclcpp::Node {
  private:
     rclcpp_action::Client<RobotAction>::SharedPtr client_ptr_;
     rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr point_sub_;
+    geometry_msgs::msg::Point prev;
     // rclcpp_action::GoalStatus status;
 
-    void goal_response_callback(std::shared_future<GoalHandleTest::SharedPtr> future) {
+    void topic_callback(const geometry_msgs::msg::Point::SharedPtr msg) {
+        geometry_msgs::msg::Pose target;
+        std::string w;
+
+        // check if its finding the same point as before
+        if (!(prev.x == msg->x && prev.y == msg->y && prev.z == msg->z)) {
+            RCLCPP_INFO(this->get_logger(), "\nGot point (%f, %f, %f). Plan and execute trajectory? (y/n)", msg->x, msg->y, msg->z);
+            std::getline(std::cin, w);
+            if (strcmp(w.c_str(), "y") == 0 || strcmp(w.c_str(), "Y") == 0) {
+                target.position = *msg;
+            
+                tf2::Quaternion rot, start, end;
+                start.setRPY(0.0, 0.0, 0.0);
+                rot.setRPY(M_PI, 0.0, 0.0);
+                end = rot * start;
+                end.normalize();
+                target.orientation = tf2::toMsg(end);
+
+                send_goal(target);
+
+                rclcpp::sleep_for(std::chrono::seconds(10));
+            } else {
+                RCLCPP_INFO(this->get_logger(), "Looking for next target...");
+            }
+        }
+
+        prev.x = msg->x;
+        prev.y = msg->y;
+        prev.z = msg->z;
+    }
+
+
+    void goal_response_callback(const GoalHandleTest::SharedPtr &future) {
         auto goal_handle = future.get();
         if (!goal_handle) {
             RCLCPP_ERROR(this->get_logger(), "Goal rejected by server.");
         } else {
-            RCLCPP_INFO(this->get_logger(), "Goal accepted by server, waiting for result.");
+            RCLCPP_INFO(this->get_logger(), "Goal accepted by server, planning and executing...");
         }
     }
 
-    // void feedback_callback(GoalHandleTest::SharedPtr ptr, const std::shared_ptr<const RobotAction::Feedback> feedback) {
-    //     RCLCPP_INFO(this->get_logger(), feedback->progress);
-    // }
-
-    void topic_callback(const geometry_msgs::msg::Point::SharedPtr msg) const {
-        RCLCPP_INFO(this->get_logger(), "Got point (%f, %f, %f). Plan Trajectory? (Press Enter)\n", msg->x, msg->y, msg->z);
-        std::string w;
-        std::getline(std::cin, w);
-
-        geometry_msgs::msg::Pose target;
-        target.position = *msg;
-        
-        tf2::Quaternion rot, start, end;
-        start.setRPY(0.0, 0.0, 0.0);
-        rot.setRPY(M_PI, 0.0, 0.0);
-        end = rot * start;
-        end.normalize();
-        target.orientation = tf2::toMsg(end);
-
-        send_goal(target);
-
-        rclcpp::sleep_for(std::chrono::seconds(10));
-
-        // create vector of points
-        // std::vector<geometry_msgs::msg::Pose> pose_list;
-
-        // // use test pose to see if it works;
-        // geometry_msgs::msg::Pose test_pose;
-        // test_pose.position.x = 0.5;
-        // test_pose.position.y = 0.5;
-        // test_pose.position.z = 0.25;
-
-        // geometry_msgs::msg::Pose test2;
-        // test2.position.x = 0.3;
-        // test2.position.y = 0.5;
-        // test2.position.z = 0.5;
-        // test2.orientation = tf2::toMsg(end);
-
-        // pose_list.push_back(test_pose);
-        // pose_list.push_back(test2);
-
-        // client->send_goal(pose_list);
+    void feedback_callback(GoalHandleTest::SharedPtr ptr, const std::shared_ptr<const RobotAction::Feedback> feedback) {
+        switch (feedback->is_execution_done) {
+            case 1:
+                RCLCPP_INFO(this->get_logger(), "Planning and execution completed with success!");
+                break;
+            default:
+                RCLCPP_INFO(this->get_logger(), "Planning and execution failed...");
+                break;
+        }
     }
 
     void result_callback(const GoalHandleTest::WrappedResult &result) {
         switch (result.code)
         {
         case rclcpp_action::ResultCode::SUCCEEDED:
+            RCLCPP_INFO(this->get_logger(), "Ready for next target!");
             break;
         case rclcpp_action::ResultCode::ABORTED:
             RCLCPP_ERROR(this->get_logger(), "Goal aborted");
             break;
         case rclcpp_action::ResultCode::CANCELED:
-            RCLCPP_ERROR(this->get_logger(), "Goal canceleld");
+            RCLCPP_ERROR(this->get_logger(), "Goal cancelled");
             break;
         default:
             RCLCPP_ERROR(this->get_logger(), "Unknown goal result");

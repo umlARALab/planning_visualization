@@ -7,4 +7,4 @@ string result
 
 ---
 # feedback
-visualization_msgs/Marker traj
+int32 is_execution_done

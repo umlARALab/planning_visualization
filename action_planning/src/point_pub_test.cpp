@@ -45,3 +45,7 @@ int main(int argc, char * argv[])
   rclcpp::shutdown();
   return 0;
 }
+
+// command line publish
+// ros2 topic pub -1 /point_pub geometry_msgs/msg/Point "{x: 0.5, y: 0.5, z: 0.25}"
+// ros2 topic pub -1 /point_pub geometry_msgs/msg/Point "{x: 0.3, y: 0.5, z: 0.25}"

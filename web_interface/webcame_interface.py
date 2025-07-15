@@ -1,4 +1,5 @@
-#code was copied from webcam_teleop_interface -> https://github.com/hello-robot/stretch_dex_teleop/blob/main/webcam.py
+#code was adapted from stretch teleop -> https://github.com/hello-robot/stretch_dex_teleop/blob/main/webcam.py
+
 import numpy as np
 import math
 from scipy.spatial.transform import Rotation

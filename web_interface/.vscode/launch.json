@@ -8,6 +8,7 @@
             "type": "chrome",
             "request": "launch",
             "name": "Open index.html",
+            "url": "http://localhost:8080",
             "file": "/Users/tatis/vscode_robot /planning_visualization/web_interface/browser/home/index.html"
         }
     ]

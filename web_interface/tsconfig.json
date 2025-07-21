@@ -5,10 +5,8 @@
         "esModuleInterop": true,
         "jsx": "react",
         "baseUrl": ".",
-        "paths": {
-            "shared/*": ["src/shared/*"],
-            "operator/*": ["src/pages/operator/*"],
-            "robot/*": ["src/pages/robot/*"]
-        }
-    }
+    },
+    "include": [
+        "src"
+    ]
 }

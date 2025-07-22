@@ -89,8 +89,7 @@ class ArucoDetect(Node):
         # print('marker pose : \n' + str(msg.poses[0]) + '\n')
 
         marker.point = msg.poses[0].position
-        self.marker_pub.publish(marker)
-        # print('marker : \n' + str(marker.point) + '\n')
+        print('marker : \n' + str(marker.point) + '\n')
         
         for id in msg.marker_ids:
             position = msg.poses[i].position
@@ -109,19 +108,37 @@ class ArucoDetect(Node):
 
             # transform from world to camera
             if id == 130:   # base_left
-                # tf_baselink_to_cam = np.linalg.inv(tf_cam_to_marker * tf_base_left_to_base_link)
-                tf_baselink_to_cam = tf_cam_to_marker * tf_base_left_to_base_link
-            if id == 131:   # base_right
+                tf_baselink_to_cam = np.linalg.inv(tf_cam_to_marker * tf_base_left_to_base_link)
+                # tf_baselink_to_cam = tf_cam_to_marker * tf_base_left_to_base_link
+
+                # print("left")
+            elif id == 131:   # base_right
                 tf_baselink_to_cam = np.linalg.inv(tf_cam_to_marker * tf_base_right_to_base_link)
+                # tf_baselink_to_cam = tf_cam_to_marker * tf_base_right_to_base_link
+
+                # print("right")
+            else:
+                continue
 
             pose.position.x = tf_baselink_to_cam[0][3]
             pose.position.y = tf_baselink_to_cam[1][3]
             pose.position.z = tf_baselink_to_cam[2][3]
 
-            pose.orientation.x = (rot.as_quat())[0]
-            pose.orientation.y = (rot.as_quat())[1]
-            pose.orientation.z = (rot.as_quat())[2]
-            pose.orientation.w = (rot.as_quat())[3]
+            print('[0][3] : ' + str(tf_baselink_to_cam[0][3]))
+
+            new_rot = R.from_matrix([
+                [tf_baselink_to_cam[0][0], tf_baselink_to_cam[0][1], tf_baselink_to_cam[0][2]],
+                [tf_baselink_to_cam[1][0], tf_baselink_to_cam[1][1], tf_baselink_to_cam[1][2]],
+                [tf_baselink_to_cam[2][0], tf_baselink_to_cam[2][1], tf_baselink_to_cam[2][2]]
+            ])
+
+
+            pose.orientation.x = (new_rot.as_quat())[0]
+            pose.orientation.y = (new_rot.as_quat())[1]
+            pose.orientation.z = (new_rot.as_quat())[2]
+            pose.orientation.w = (new_rot.as_quat())[3]
+
+            print('pose : ' + str(pose))
 
             # print(str(id) + ': \n' + str(pose) + '\n')
 

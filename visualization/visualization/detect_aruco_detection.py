@@ -78,6 +78,7 @@ class ArucoDetect(Node):
         cam_pose = PoseArray()
         # pt = PointStamped()
         marker = PointStamped()
+
         cam_pose.header.frame_id = 'camera_color_optical_frame' # camera frame
         marker.header.frame_id = 'camera_color_optical_frame' # camera frame
         cam_pose.header.stamp = self.get_clock().now().to_msg()
@@ -86,10 +87,12 @@ class ArucoDetect(Node):
         pose_list = []
 
         tf_baselink_to_cam = np.array([])
+        tf_cam_to_baselink = np.array([])
         # print('marker pose : \n' + str(msg.poses[0]) + '\n')
 
-        marker.point = msg.poses[0].position
-        print('marker : \n' + str(marker.point) + '\n')
+        if msg.poses is not None:
+            marker.point = msg.poses[0].position
+            print('marker : \n' + str(marker.point) + '\n')
         
         for id in msg.marker_ids:
             position = msg.poses[i].position
@@ -106,25 +109,37 @@ class ArucoDetect(Node):
                 [0.0, 0.0, 0.0, 1.0]
             ])
 
+            print('cam to marker :\n' + str(tf_cam_to_marker))
+
             # transform from world to camera
             if id == 130:   # base_left
-                tf_baselink_to_cam = np.linalg.inv(tf_cam_to_marker * tf_base_left_to_base_link)
+                tf_cam_to_baselink = tf_cam_to_marker @ tf_base_left_to_base_link
                 # tf_baselink_to_cam = tf_cam_to_marker * tf_base_left_to_base_link
 
-                # print("left")
-            elif id == 131:   # base_right
-                tf_baselink_to_cam = np.linalg.inv(tf_cam_to_marker * tf_base_right_to_base_link)
-                # tf_baselink_to_cam = tf_cam_to_marker * tf_base_right_to_base_link
+                marker.point.x = tf_cam_to_baselink[0][3]
+                marker.point.y = tf_cam_to_baselink[1][3]
+                marker.point.z = tf_cam_to_baselink[2][3]
 
-                # print("right")
+                print('cam to base:\n' + str(tf_cam_to_baselink))
+            elif id == 131:   # base_right
+                tf_cam_to_baselink = tf_cam_to_marker @ tf_base_right_to_base_link
+                # tf_baselink_to_cam = tf_cam_to_marker * tf_base_right_to_base_link
+                
+                marker.point.x = tf_cam_to_baselink[0][3]
+                marker.point.y = tf_cam_to_baselink[1][3]
+                marker.point.z = tf_cam_to_baselink[2][3]
+
+                print('base from right: ' + str(marker.point))
             else:
                 continue
 
-            pose.position.x = tf_baselink_to_cam[0][3]
-            pose.position.y = tf_baselink_to_cam[1][3]
-            pose.position.z = tf_baselink_to_cam[2][3]
+            tf_baselink_to_cam = np.linalg.inv(tf_cam_to_baselink)
 
-            print('[0][3] : ' + str(tf_baselink_to_cam[0][3]))
+            self.marker_pub.publish(marker)
+
+            pose.position.x = tf_baselink_to_cam[0][3] # + marker.point.x
+            pose.position.y = tf_baselink_to_cam[1][3] # + marker.point.y
+            pose.position.z = tf_baselink_to_cam[2][3] # + marker.point.z
 
             new_rot = R.from_matrix([
                 [tf_baselink_to_cam[0][0], tf_baselink_to_cam[0][1], tf_baselink_to_cam[0][2]],
@@ -132,13 +147,13 @@ class ArucoDetect(Node):
                 [tf_baselink_to_cam[2][0], tf_baselink_to_cam[2][1], tf_baselink_to_cam[2][2]]
             ])
 
+            pose.orientation = orientation
+            # pose.orientation.x = (new_rot.as_quat())[0]
+            # pose.orientation.y = (new_rot.as_quat())[1]
+            # pose.orientation.z = (new_rot.as_quat())[2]
+            # pose.orientation.w = (new_rot.as_quat())[3]
 
-            pose.orientation.x = (new_rot.as_quat())[0]
-            pose.orientation.y = (new_rot.as_quat())[1]
-            pose.orientation.z = (new_rot.as_quat())[2]
-            pose.orientation.w = (new_rot.as_quat())[3]
-
-            print('pose : ' + str(pose))
+            print('pose :\n' + str(tf_baselink_to_cam))
 
             # print(str(id) + ': \n' + str(pose) + '\n')
 
@@ -146,7 +161,7 @@ class ArucoDetect(Node):
 
         if pose_list:
             cam_pose.poses = pose_list
-            print('left pose : \n' + str(pose_list[0]) + '\n')
+            # print('left pose : \n' + str(pose_list[0]) + '\n')
             # print('right pose : \n' + str(pose_list[1]) + '\n')
 
             self.cam_pose_pub.publish(cam_pose)

@@ -6,3 +6,6 @@ Action_planning is a package that holds the action server and client. It provide
 
 # Web Interface
 Web_interface holds all files related to the web interface. 
+
+# Visualization
+Calculates an estimate position of an external camera given a detected aruco marker pose.

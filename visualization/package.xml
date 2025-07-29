@@ -12,7 +12,6 @@
   <depend>geometry_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>cv_bridge</depend>
-  <depend>cv2</depend>
   <depend>tf2_ros</depend>
   <depend>ros2_aruco_interfaces</depend>
 

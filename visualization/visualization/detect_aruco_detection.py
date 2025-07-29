@@ -147,11 +147,11 @@ class ArucoDetect(Node):
                 [tf_baselink_to_cam[2][0], tf_baselink_to_cam[2][1], tf_baselink_to_cam[2][2]]
             ])
 
-            pose.orientation = orientation
-            # pose.orientation.x = (new_rot.as_quat())[0]
-            # pose.orientation.y = (new_rot.as_quat())[1]
-            # pose.orientation.z = (new_rot.as_quat())[2]
-            # pose.orientation.w = (new_rot.as_quat())[3]
+            # pose.orientation = orientation
+            pose.orientation.x = (new_rot.as_quat())[0]
+            pose.orientation.y = (new_rot.as_quat())[1]
+            pose.orientation.z = (new_rot.as_quat())[2]
+            pose.orientation.w = (new_rot.as_quat())[3]
 
             print('pose :\n' + str(tf_baselink_to_cam))
 

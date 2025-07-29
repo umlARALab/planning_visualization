@@ -1,5 +1,7 @@
 #include <rclcpp/rclcpp.hpp>
-#include <geometry_msgs/msg/point.hpp>
+#include <geometry_msgs/msg/point_stamped.hpp>
+#include <cstdlib>
+#include <ctime>
 
 using namespace std::chrono_literals;
 
@@ -15,26 +17,27 @@ class MinimalPublisher : public rclcpp::Node
     MinimalPublisher()
     : Node("minimal_publisher")
     {
-      publisher_ = this->create_publisher<geometry_msgs::msg::Point>("point_pub", 10);
+      publisher_ = this->create_publisher<geometry_msgs::msg::PointStamped>("point_pub", 10);
       timer_ = this->create_wall_timer(
-      500ms, std::bind(&MinimalPublisher::timer_callback, this));
+      20s, std::bind(&MinimalPublisher::timer_callback, this));
+
+      srand(time(0));
     }
 
   private:
-    geometry_msgs::msg::Point prev;
-
     void timer_callback()
     {
-      geometry_msgs::msg::Point message;
+      geometry_msgs::msg::PointStamped message;
+      message.header.frame_id = "panda_link0";
       
-      message.x = 0.5;
-      message.y = 0.5;
-      message.z = 0.25;
+      // message.point.x = ((rand() % 10) - 5.0) / 10.0;
+      // message.point.y = ((rand() % 10) - 5.0) / 10.0;;
+      // message.point.z = 0.25;
 
       publisher_->publish(message);
     }
     rclcpp::TimerBase::SharedPtr timer_;
-    rclcpp::Publisher<geometry_msgs::msg::Point>::SharedPtr publisher_;
+    rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr publisher_;
     size_t count_;
 };
 

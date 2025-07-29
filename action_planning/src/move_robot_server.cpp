@@ -102,8 +102,6 @@ class ArmActionServer : public rclcpp::Node {
 
     // do stuff when the goal is executed
     void accept_goal(std::shared_ptr<GoalHandleTest> goal_handle) {
-        // // needs to return quickly to avoid blocking executor --> spin new thread
-        // std::thread{std::bind(&ArmActionServer::execute, this, std::placeholders::_1), goal_handle}.detach();
         RCLCPP_INFO_ONCE(this->get_logger(), "\n[robot server: planning]\n");
 
         // initialize container for list of waypoints
@@ -122,10 +120,6 @@ class ArmActionServer : public rclcpp::Node {
         const auto goal_pose = goal_handle->get_goal();
         auto result = std::make_shared<RobotAction::Result>();
         auto feedback = std::make_shared<RobotAction::Feedback>();
-
-        // set feedback
-        feedback->set__is_execution_done(0);
-        goal_handle->publish_feedback(feedback);
 
         // ADD WAYPOINTS
         // prepare to pick
@@ -205,6 +199,7 @@ class ArmActionServer : public rclcpp::Node {
             feedback->set__is_execution_done(1);
         } else {
             RCLCPP_ERROR(this->get_logger(), "Planning failed");
+            feedback->set__is_execution_done(0);
         }
 
         goal_handle->publish_feedback(feedback);

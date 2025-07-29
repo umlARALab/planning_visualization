@@ -58,38 +58,28 @@ class ArmActionClient : public rclcpp::Node {
         // set goal
         goal_msg.pose_goal = pose;
 
-        // send goal to server when it is ready
-        if (!this->client_ptr_->wait_for_action_server(std::chrono::seconds(60))) {
-            RCLCPP_INFO(this->get_logger(), "Action server not ready in time");
-        }
-
-        // RCLCPP_INFO(this->get_logger(), "[client] Action server ready");
-
-        // this->client_ptr_->async_send_goal(goal_msg);
-
+        // send goal to robot
         auto send_goal_options = rclcpp_action::Client<RobotAction>::SendGoalOptions();
         send_goal_options.goal_response_callback = std::bind(&ArmActionClient::goal_response_callback, this, std::placeholders::_1);
         send_goal_options.feedback_callback = std::bind(&ArmActionClient::feedback_callback, this, std::placeholders::_1, std::placeholders::_2);
         send_goal_options.result_callback = std::bind(&ArmActionClient::result_callback, this, std::placeholders::_1);
 
         client_ptr_->async_send_goal(goal_msg, send_goal_options);
-        // RCLCPP_INFO(this->get_logger(), "[client] Action goal done");
-
-        // auto goal_options = rclcpp_action::Client<RobotAction>::SendGoalOptions();
-        // goal_options.goal_response_callback = std::bind(%ArmActionClient::goal)
-        // this->client_ptr_->async_send_goal(goal_msg);
-
     }
 
  private:
     rclcpp_action::Client<RobotAction>::SharedPtr client_ptr_;
     rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr point_sub_;
     geometry_msgs::msg::Point prev;
-    // rclcpp_action::GoalStatus status;
 
     void topic_callback(const geometry_msgs::msg::PointStamped::SharedPtr msg) {
         geometry_msgs::msg::Pose target;
         std::string w;
+
+        if (!this->client_ptr_->wait_for_action_server(std::chrono::seconds(60))) {
+            RCLCPP_ERROR(this->get_logger(), "action server not available after waiting");
+            rclcpp::shutdown();
+        }
 
         // check if its finding the same point as before
         if (!(prev.x == msg->point.x && prev.y == msg->point.y && prev.z == msg->point.z)) {

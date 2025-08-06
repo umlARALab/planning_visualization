@@ -13,6 +13,8 @@ import cv2
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
+camera_frame = 'base_link'
+
 stretch_aruco_ids = {
     'base_left': {
         'id': 130,
@@ -69,19 +71,19 @@ class ArucoDetect(Node):
         #     self.cam_callback(),
         #     10
         # )
-        self.cam_pose_pub = self.create_publisher(PoseArray, '/camera_position', 10)
+        self.cam_pose_pub = self.create_publisher(Pose, '/camera_position', 10)
         self.marker_pub = self.create_publisher(PointStamped, '/marker_position', 10)
 
 
     def aruco_callback(self, msg):
         i = 0
-        cam_pose = PoseArray()
+        cam_pose = Pose()
         # pt = PointStamped()
         marker = PointStamped()
 
-        cam_pose.header.frame_id = 'camera_color_optical_frame' # camera frame
-        marker.header.frame_id = 'camera_color_optical_frame' # camera frame
-        cam_pose.header.stamp = self.get_clock().now().to_msg()
+        # cam_pose.header.frame_id = camera_frame # camera frame
+        marker.header.frame_id = camera_frame # camera frame
+        # cam_pose.header.stamp = self.get_clock().now().to_msg()
         marker.header.stamp = self.get_clock().now().to_msg()
 
         pose_list = []
@@ -92,8 +94,8 @@ class ArucoDetect(Node):
 
         if msg.poses is not None:
             marker.point = msg.poses[0].position
-            print('marker : \n' + str(marker.point) + '\n')
-        
+            # print('marker : \n' + str(marker.point) + '\n')
+
         for id in msg.marker_ids:
             position = msg.poses[i].position
             orientation = msg.poses[i].orientation
@@ -109,7 +111,7 @@ class ArucoDetect(Node):
                 [0.0, 0.0, 0.0, 1.0]
             ])
 
-            print('cam to marker :\n' + str(tf_cam_to_marker))
+            # print('cam to marker :\n' + str(tf_cam_to_marker))
 
             # transform from world to camera
             if id == 130:   # base_left
@@ -120,7 +122,7 @@ class ArucoDetect(Node):
                 marker.point.y = tf_cam_to_baselink[1][3]
                 marker.point.z = tf_cam_to_baselink[2][3]
 
-                print('cam to base:\n' + str(tf_cam_to_baselink))
+                # print('cam to base:\n' + str(tf_cam_to_baselink))
             elif id == 131:   # base_right
                 tf_cam_to_baselink = tf_cam_to_marker @ tf_base_right_to_base_link
                 # tf_baselink_to_cam = tf_cam_to_marker * tf_base_right_to_base_link
@@ -129,7 +131,7 @@ class ArucoDetect(Node):
                 marker.point.y = tf_cam_to_baselink[1][3]
                 marker.point.z = tf_cam_to_baselink[2][3]
 
-                print('base from right: ' + str(marker.point))
+                # print('base from right: ' + str(marker.point))
             else:
                 continue
 
@@ -153,18 +155,29 @@ class ArucoDetect(Node):
             pose.orientation.z = (new_rot.as_quat())[2]
             pose.orientation.w = (new_rot.as_quat())[3]
 
-            print('pose :\n' + str(tf_baselink_to_cam))
+            # print('pose :\n' + str(tf_baselink_to_cam))
 
-            # print(str(id) + ': \n' + str(pose) + '\n')
+            # print(str(id) + ': \n' + str(pose) + '\n')pose_list
 
             pose_list.append(pose)
+        
+        avg_pos = [0.0, 0.0, 0.0]
+        for pt in pose_list:
+            avg_pos[0] += pt.position.x
+            avg_pos[1] += pt.position.y
+            avg_pos[2] += pt.position.z
 
-        if pose_list:
-            cam_pose.poses = pose_list
+        cam_pose = pose_list[0] # get orientation
+        cam_pose.position.x = avg_pos[0] / len(pose_list)
+        cam_pose.position.y = avg_pos[1] / len(pose_list)
+        cam_pose.position.z = avg_pos[2] / len(pose_list)
+        # if pose_list:
+            # cam_pose.poses = pose_list
             # print('left pose : \n' + str(pose_list[0]) + '\n')
             # print('right pose : \n' + str(pose_list[1]) + '\n')
-
-            self.cam_pose_pub.publish(cam_pose)
+        
+        print(cam_pose)
+        self.cam_pose_pub.publish(cam_pose)
 
 
 def main():

@@ -63,9 +63,14 @@
                     </div>
 
                     <!-- 3rd row -->
-                    <div class="col-md-12 text-center my-2">
-                        <button @click="backward" :disabled="loading || !connected" class="btn btn-primary">Go
-                            backward</button>
+                    <div class="col-md-4 text-center my-2">
+                        <button @click="gripperOpen" :disabled="loading || !connected" class="btn btn-primary">Open</button>
+                    </div>
+                    <div class="col-md-4 text-center my-2">
+                        <button @click="backward" :disabled="loading || !connected" class="btn btn-primary">Go backward</button>
+                    </div>
+                    <div class="col-md-4 text-center my-2">
+                        <button @click="gripperClose" :disabled="loading || !connected" class="btn btn-primary">Close</button>
                     </div>
                 </div>
             </div>

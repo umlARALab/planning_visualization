@@ -20,7 +20,7 @@ var app = new Vue({
         port: '9090',
         // subscriber for joint states
         joint_state_data: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        step: [0.05, 0.1, 0.5, 0.5, 0.5, 0.25, 0.4],
+        step: [0.05, 0.05, 0.5, 0.5, 0.5, 0.25, 0.4],
         // action
         // actionClient: null
     },
@@ -70,18 +70,19 @@ var app = new Vue({
 
             let goal = {
                 trajectory: {
-                    joint_names: ['joint_lift'], 
+                    joint_names: [name], 
                     points: [{positions: [new_pos], time_from_start: {sec: 2}}]
                 }
             }
 
-            var goal_id = actionClient.sendGoal(goal, function(result) {
-                console.log('Result ');
-                },
-                function(feedback) {
-                console.log('Feedback');
-                },
-            )
+            var goal_id = actionClient.sendGoal(goal)
+        //     , function(result) {
+        //         // console.log('Result ');
+        //         },
+        //         function(feedback) {
+        //         // console.log('Feedback');
+        //         },
+        //     )
         },
         cancelGoal: function() {
             this.goal.cancel()
@@ -107,7 +108,7 @@ var app = new Vue({
                     return 11
             }
         },
-        // navigation
+        /*          ------  NAVIGATION ------          */
         setTopic: function() {
             this.callNavSrv()
             this.topic = new ROSLIB.Topic({
@@ -161,7 +162,7 @@ var app = new Vue({
             this.setTopic()
             this.topic.publish(this.message)
         },
-        // manipulation
+        /*          ------ MANIPULATION ------          */
         // joint state names [wrist_extension, joint_lift, joint_arm_l3, joint_arm_l2, joint_arm_l1, joint_arm_l0, 
         //                    joint_head_pan, joint_head_tilt, joint_wrist_yaw, joint_wrist_pitch, joint_wrist_roll,
         //                    joint_gripper_finger_left, joint_gripper_finger_right]
@@ -181,6 +182,76 @@ var app = new Vue({
             // console.log(new_pos)
             this.sendGoal('joint_lift', new_pos)
         },
+        wristExtend: function() {
+            this.callManSrv()
+            let name = this.getIndex('wrist_extension')
+            let new_pos = joint_state_data[name] + (this.step[0])
+            // console.log(new_pos)
+            this.sendGoal('wrist_extension', new_pos)
+        },
+        wristRetract: function() {
+            this.callManSrv()
+            let name = this.getIndex('wrist_extension')
+            let new_pos = joint_state_data[name] + (this.step[0] * -1)
+            // console.log(new_pos)
+            this.sendGoal('wrist_extension', new_pos)
+        },
+        gripperOpen: function() {
+            this.callManSrv()
+            let new_pos = 0.2
+            // console.log(new_pos)
+            this.sendGoal('joint_gripper_finger_left', new_pos)
+        },
+        gripperClose: function() {
+            this.callManSrv()
+            let new_pos = 0.0
+            // console.log(new_pos)
+            this.sendGoal('joint_gripper_finger_left', new_pos)
+        },
+        wristPitchUp: function() {
+            this.callManSrv()
+            let name = this.getIndex('joint_wrist_pitch')
+            let new_pos = joint_state_data[name] + (this.step[5])
+            // console.log(new_pos)
+            this.sendGoal('joint_wrist_pitch', new_pos)
+        },
+        wristPitchDown: function() {
+            this.callManSrv()
+            let name = this.getIndex('joint_wrist_pitch')
+            let new_pos = joint_state_data[name] + (this.step[5] * -1)
+            // console.log(new_pos)
+            this.sendGoal('joint_wrist_pitch', new_pos)
+        },
+        wristRollCCW: function() { // check if it is actually counter clockwise
+            this.callManSrv()
+            let name = this.getIndex('joint_wrist_roll')
+            let new_pos = joint_state_data[name] + (this.step[6])
+            // console.log(new_pos)
+            this.sendGoal('joint_wrist_roll', new_pos)
+        },
+        wristRollCW: function() {
+            this.callManSrv()
+            let name = this.getIndex('joint_wrist_roll')
+            let new_pos = joint_state_data[name] + (this.step[6] * -1)
+            // console.log(new_pos)
+            this.sendGoal('joint_wrist_roll', new_pos)
+        },
+        wristYawRight: function() {
+            this.callManSrv()
+            let name = this.getIndex('joint_wrist_yaw')
+            let new_pos = joint_state_data[name] + (this.step[4])
+            // console.log(new_pos)
+            this.sendGoal('joint_wrist_yaw', new_pos)
+        },
+        wristYawLeft: function() {
+            this.callManSrv()
+            let name = this.getIndex('joint_wrist_yaw')
+            let new_pos = joint_state_data[name] + (this.step[4] * -1)
+            // console.log(new_pos)
+            this.sendGoal('joint_wrist_yaw', new_pos)
+        },
+        
+        /*          ------ CAMERA & IMAGING ------          */
         setCamera: function() {
             let host = '192.168.10.5'
             let viewer = new MJPEGCANVAS.Viewer({
@@ -205,6 +276,8 @@ var app = new Vue({
         //         ssl: false,
         //     })
         // },
+
+        /*          ------ HELPER FUNCTIONS ------          */
         callNavSrv: function() {
             let nav_srv = new ROSLIB.Service({
                 ros: this.ros,

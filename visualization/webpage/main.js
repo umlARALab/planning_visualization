@@ -21,8 +21,8 @@ var app = new Vue({
         // subscriber for joint states
         joint_state_data: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
         step: [0.05, 0.1, 0.5, 0.5, 0.5, 0.25, 0.4],
-        // action goal
-        // goal: null
+        // action
+        // actionClient: null
     },
     // helper methods to connect to ROS
     methods: {
@@ -68,23 +68,20 @@ var app = new Vue({
                 actionType: 'control_msgs/action/FollowJointTrajectory'
             })
 
-            let goal =  new ROSLIB.ActionGoal ({
-                trajectory: {joint_names: [name], points: [{position: [new_pos], time_from_start: {sec: 2}}]}
-            })
-            
-            // this.goal = new ROSLIB.goal({
-            //     actionClient: actionClient,
-            //     goalMessage: this.action.goal.trajectory
-            // })
+            let goal = {
+                trajectory: {
+                    joint_names: ['joint_lift'], 
+                    points: [{positions: [new_pos], time_from_start: {sec: 2}}]
+                }
+            }
 
-            // this.goal.on('feedback', (feedback) => {
-            //     this.action.feedback = feedback
-            // })
-            // this.goal.on('result', (result) => {
-            //     this.action.result = result
-            // })
-
-            let goal_id = actionClient.sendGoal(goal)
+            var goal_id = actionClient.sendGoal(goal, function(result) {
+                console.log('Result ');
+                },
+                function(feedback) {
+                console.log('Feedback');
+                },
+            )
         },
         cancelGoal: function() {
             this.goal.cancel()
@@ -121,46 +118,46 @@ var app = new Vue({
         },
         forward: function() {
             this.callNavSrv()
-            this.message = new ROSLIB.Message({
+            this.message = {
                 linear: { x: 1, y: 0, z: 0, },
                 angular: { x: 0, y: 0, z: 0, },
-            })
+            }
             this.setTopic()
             this.topic.publish(this.message)
         },
         stop: function() {
             this.callNavSrv()
-            this.message = new ROSLIB.Message({
+            this.message = {
                 linear: { x: 0, y: 0, z: 0, },
                 angular: { x: 0, y: 0, z: 0, },
-            })
+            }
             this.setTopic()
             this.topic.publish(this.message)
         },
         backward: function() {
             this.callNavSrv()
-            this.message = new ROSLIB.Message({
+            this.message = {
                 linear: { x: -1, y: 0, z: 0, },
                 angular: { x: 0, y: 0, z: 0, },
-            })
+            }
             this.setTopic()
             this.topic.publish(this.message)
         },
         turnLeft: function() {
             this.callNavSrv()
-            this.message = new ROSLIB.Message({
+            this.message = {
                 linear: { x: 0.0, y: 0, z: 0, },
                 angular: { x: 0, y: 0, z: 0.5, },
-            })
+            }
             this.setTopic()
             this.topic.publish(this.message)
         },
         turnRight: function() {
             this.callNavSrv()
-            this.message = new ROSLIB.Message({
+            this.message = {
                 linear: { x: 0.0, y: 0, z: 0, },
                 angular: { x: 0, y: 0, z: -0.5, },
-            })
+            }
             this.setTopic()
             this.topic.publish(this.message)
         },
@@ -174,12 +171,14 @@ var app = new Vue({
             this.callManSrv()
             let name = this.getIndex('joint_lift')
             let new_pos = joint_state_data[name] + (this.step[1])
+            // console.log(new_pos)
             this.sendGoal('joint_lift', new_pos)
         },
         armLiftDown: function() {
             this.callManSrv()
             let name = this.getIndex('joint_lift')
             let new_pos = joint_state_data[name] + (this.step[1] * -1)
+            // console.log(new_pos)
             this.sendGoal('joint_lift', new_pos)
         },
         setCamera: function() {
@@ -194,6 +193,18 @@ var app = new Vue({
                 ssl: false,
             })
         },
+        // setCamera2: function() {
+        //     let host = '192.168.10.5'
+        //     let viewer = new MJPEGCANVAS.Viewer({
+        //         divID: 'divCamera',
+        //         host: host,
+        //         port: 8080,
+        //         width: 640,
+        //         height: 480,
+        //         topic: '/oak/rgb/image_raw',
+        //         ssl: false,
+        //     })
+        // },
         callNavSrv: function() {
             let nav_srv = new ROSLIB.Service({
                 ros: this.ros,
@@ -224,23 +235,18 @@ var app = new Vue({
                 }
             )
         }
-        // setCamera2: function() {
-        //     // let without_wss = this.rosbridge_address.split('wss://')[1]
-        //     // console.log(without_wss)
-        //     // let domain = without_wss.split('/')[0] + '/' + without_wss.split('/')[1]
-        //     // console.log(domain)
-        //     let host = '192.168.10.5:7000'
-        //     let viewer = new MJPEGCANVAS.Viewer({
-        //         divID: 'divCamera2',
-        //         host: host,
-        //         width: 480,
-        //         height: 640,
-        //         topic: '/camera/depth/image_rect_raw',
-        //         ssl: true,
-        //     })
-        // },
     },
     mounted() {
     },
 })
 
+
+
+// {
+//     trajectory: {
+//         joint_names: ['joint_head_pan'], 
+//         points: [
+//             {positions: [0.0], time_from_start: {sec: 2}}
+//         ]
+//     }
+// }

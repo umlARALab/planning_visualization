@@ -17,9 +17,9 @@ def generate_launch_description():
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(stretch_driver_launch_file)
         ),
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(stretch_camera_launch_file)
-        ),
+        # IncludeLaunchDescription(
+        #     PythonLaunchDescriptionSource(stretch_camera_launch_file)
+        # ),
         IncludeLaunchDescription(
             XMLLaunchDescriptionSource(rosbridge_launch_file),
         ),

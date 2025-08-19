@@ -17,9 +17,9 @@ def generate_launch_description():
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(stretch_driver_launch_file)
         ),
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(stretch_camera_launch_file)
-        ),
+        # IncludeLaunchDescription(
+        #     PythonLaunchDescriptionSource(stretch_camera_launch_file)
+        # ),
         IncludeLaunchDescription(
             XMLLaunchDescriptionSource(rosbridge_launch_file),
         ),
@@ -27,6 +27,7 @@ def generate_launch_description():
             package='web_video_server',
             executable='web_video_server',
             name='web_video_server',
-            parameters=[{'port':8080}, {'address':'192.168.10.5'}]
+            parameters=[{'port':8080}, {'address':'192.168.10.5'}],
+            output='log'
         )
     ])

@@ -50,10 +50,10 @@ ament_target_dependencies(action_client
   "tf2_geometry_msgs"
 )
 
-add_executable(point_pub src/point_pub_test.cpp)
+add_executable(point_pub src/point_pub_test.py)
 ament_target_dependencies(point_pub
-  "rclcpp"
-  "geometry_msgs"
+  "rclpy"
+  "trajectory_msgs"
 )
 
 

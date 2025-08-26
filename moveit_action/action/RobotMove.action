@@ -1,6 +1,7 @@
 # request
 geometry_msgs/Pose pose_goal
 
+
 ---
 # result
 string result

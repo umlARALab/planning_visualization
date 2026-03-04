@@ -13,7 +13,8 @@ import cv2
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
-camera_frame = 'base_link'
+# camera_frame = 'base_link' 
+camera_frame = 'oak_imu_frame'
 
 stretch_aruco_ids = {
     'base_left': {
@@ -67,7 +68,7 @@ class ArucoDetect(Node):
         )
         # self.camera_sub = self.create_subscription(
         #     Image,
-        #     '/camera/color/image_raw',
+        #     '/oak/rgb/image_raw',
         #     self.cam_callback(),
         #     10
         # )

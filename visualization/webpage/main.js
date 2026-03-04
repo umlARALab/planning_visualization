@@ -16,7 +16,7 @@ var app = new Vue({
         loading: false,
         topic: '/stretch/joint_states',
         msg: null,
-        rosbridge_address: 'ws://192.168.10.5:9090',
+        rosbridge_address: 'ws://192.168.10.40:9090', // robot IP
         port: '9090',
         // subscriber for joint states
         joint_state_data: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],

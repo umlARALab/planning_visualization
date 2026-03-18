@@ -177,7 +177,7 @@ class ArucoDetect(Node):
             # print('left pose : \n' + str(pose_list[0]) + '\n')
             # print('right pose : \n' + str(pose_list[1]) + '\n')
         
-        print(cam_pose)
+        # print(cam_pose)
         self.cam_pose_pub.publish(cam_pose)
 
 

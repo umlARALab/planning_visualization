@@ -23,4 +23,9 @@ def generate_launch_description():
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(aruco_launch_file)
         ),
+        # Node(
+        #     package='visualization',
+        #     executable='aruco_camera_position',
+        #     name="aruco_camera_position"
+        # ),
     ])

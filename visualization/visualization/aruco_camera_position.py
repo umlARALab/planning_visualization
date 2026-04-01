@@ -163,11 +163,20 @@ class ArucoDetect(Node):
                 pose.pose.position.y = tf_baselink_to_cam[1][3] # + marker.point.y
                 pose.pose.position.z = tf_baselink_to_cam[2][3] # + marker.point.z
 
-                new_rot = R.from_matrix([
+                baselink_to_cam_rot = np.array([
                     [tf_baselink_to_cam[0][0], tf_baselink_to_cam[0][1], tf_baselink_to_cam[0][2]],
                     [tf_baselink_to_cam[1][0], tf_baselink_to_cam[1][1], tf_baselink_to_cam[1][2]],
                     [tf_baselink_to_cam[2][0], tf_baselink_to_cam[2][1], tf_baselink_to_cam[2][2]]
                 ])
+
+                cam_to_world_rot = np.array([
+                    [0, -1.0, 0],
+                    [0, 0, -1.0],
+                    [1.0, 0, 0]
+                ])
+
+
+                new_rot = R.from_matrix(baselink_to_cam_rot @ cam_to_world_rot)
 
                 # pose.orientation = orientation
                 pose.pose.orientation.x = (new_rot.as_quat())[0]

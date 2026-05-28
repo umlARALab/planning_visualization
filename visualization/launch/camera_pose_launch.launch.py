@@ -9,7 +9,7 @@ from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
     share_dir = get_package_share_directory('visualization')
-    stretch_driver_launch_file = PathJoinSubstitution([get_package_share_directory('stretch_core'), 'launch', 'stretch_driver.launch.py'])
+    # stretch_driver_launch_file = PathJoinSubstitution([get_package_share_directory('stretch_core'), 'launch', 'stretch_driver.launch.py'])
     stretch_camera_launch_file = PathJoinSubstitution([get_package_share_directory('depthai_ros_driver'), 'launch', 'camera.launch.py'])
     aruco_launch_file = PathJoinSubstitution([get_package_share_directory('ros2_aruco'), 'launch', 'aruco_recognition.launch.py'])
 
@@ -17,9 +17,9 @@ def generate_launch_description():
         # IncludeLaunchDescription(
         #     PythonLaunchDescriptionSource(stretch_driver_launch_file)
         # ),
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(stretch_camera_launch_file)
-        ),
+        # IncludeLaunchDescription(
+        #     PythonLaunchDescriptionSource(stretch_camera_launch_file)
+        # ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(aruco_launch_file)
         ),

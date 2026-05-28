@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 
-from geometry_msgs.msg import PoseArray, PointStamped, PoseStamped
+from geometry_msgs.msg import PoseArray, PointStamped, PoseStamped, Pose
 from ros2_aruco_interfaces.msg import ArucoMarkers
 from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
@@ -10,6 +10,7 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 import cv2
 
+from ros2_numpy import numpify
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
@@ -17,43 +18,15 @@ base_frame = 'base_link'
 camera_frame = 'oak_rgb_camera_optical_frame'
 
 stretch_aruco_ids = {
-    'base_left': {
-        'id': 130,
-        'link': 'link_aruco_left_base'
-    },
-    'base_right': {
-        'id': 131,
-        'link': 'link_aruco_right_base'
-    },
-    'wrist_inside': {
-        'id': 132,
-        'link': 'link_aruco_inner_wrist'
-    },
-    'wrist_top': {
-        'id': 133, 
-        'link': 'link_aruco_top_wrist'
-    },
-    'shoulder_top': {
-        'id': 134,
-        'link': 'link_aruco_shoulder'
-    }
+    130: 'link_aruco_left_base',
+    131: 'link_aruco_right_base', 
+    132: 'link_aruco_inner_wrist', 
+    133: 'link_aruco_top_wrist',
+    134: 'link_aruco_shoulder',
+    135: 'link_aruco_d405',
+    200: 'link_aruco_fingertip_left',
+    201: 'link_aruco_fingertip_right'
 }
-
-# transform information
-tf_base_left_to_base_link = np.array([
-    [-0.0, -1.0,  0.0,  0.130],
-    [1.0, -0.0,  0.0,  0.005],
-    [0.0,  0.0,  1.0, -0.160],
-    [0.0,  0.0,  0.0,  1.0]
-])
-
-
-tf_base_right_to_base_link = np.array([
-    [-0.0, -1.0,  0.0, -0.130],
-    [1.0, -0.0,  0.0,  0.002],
-    [0.0,  0.0,  1.0, -0.160],
-    [0.0,  0.0,  0.0,  1.0]
-])
 
 class ArucoDetect(Node):
     def __init__(self):
@@ -66,193 +39,298 @@ class ArucoDetect(Node):
             self.aruco_callback,
             10
         )
-        # self.camera_sub = self.create_subscription(
-        #     Image,
-        #     '/oak/rgb/image_raw',
-        #     self.cam_callback(),
-        #     10
-        # )
-        self.cam_pose_pub = self.create_publisher(PoseStamped, '/camera_position', 10)
-        self.marker_pub = self.create_publisher(PointStamped, '/marker_position', 10)
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
 
+        self.cam_pose_pub = self.create_publisher(PoseStamped, '/camera_position', 10)
+
+    # get the standard transforms so we only have to do it once per callback
+    def get_base_tf(self):
+            tf_to_wrist_roll = self.tf_buffer.lookup_transform(
+                'link_gripper_s3_body',
+                'link_wrist_roll',
+                rclpy.time.Time()
+            )
+            gripper_body_tf_wrist_roll = numpify(tf_to_wrist_roll.transform)
+
+            tf_to_wrist_pitch = self.tf_buffer.lookup_transform(
+                'link_wrist_roll',
+                'link_wrist_pitch',
+                rclpy.time.Time()
+            )
+            wrist_roll_tf_wrist_pitch = numpify(tf_to_wrist_pitch.transform)
+            
+            tf_to_wrist_yaw_bottom = self.tf_buffer.lookup_transform(
+                'link_wrist_pitch',
+                'link_wrist_yaw_bottom',
+                rclpy.time.Time()
+            )
+            wrist_pitch_tf_wrist_yaw_bottom = numpify(tf_to_wrist_yaw_bottom.transform)
+
+            tf_to_wrist_yaw = self.tf_buffer.lookup_transform(
+                'link_wrist_yaw_bottom',
+                'link_wrist_yaw',
+                rclpy.time.Time()
+            )
+            wrist_yaw_bottom_tf_wrist_yaw = numpify(tf_to_wrist_yaw.transform)
+
+            tf_to_arm_l0 = self.tf_buffer.lookup_transform(
+                'link_wrist_yaw',
+                'link_arm_l0',
+                rclpy.time.Time()
+            )
+            wrist_yaw_tf_arm_l0 = numpify(tf_to_arm_l0.transform)
+
+            tf_to_arm_l1 = self.tf_buffer.lookup_transform(
+                'link_arm_l0',
+                'link_arm_l1',
+                rclpy.time.Time()
+            ) 
+            arm_l0_tf_arm_l1 = numpify(tf_to_arm_l1.transform)
+
+            tf_to_arm_l2 = self.tf_buffer.lookup_transform(
+                'link_arm_l1',
+                'link_arm_l2',
+                rclpy.time.Time()
+            )        
+            arm_l1_tf_arm_l2 = numpify(tf_to_arm_l2.transform)
+
+            tf_to_arm_l3 = self.tf_buffer.lookup_transform(
+                'link_arm_l2',
+                'link_arm_l3',
+                rclpy.time.Time()
+            )
+            arm_l2_tf_arm_l3 = numpify(tf_to_arm_l3.transform)
+
+            tf_to_arm_l4 = self.tf_buffer.lookup_transform(
+                'link_arm_l3',
+                'link_arm_l4',
+                rclpy.time.Time()
+            )
+            arm_l3_tf_arm_l4 = numpify(tf_to_arm_l4.transform)
+
+            tf_to_lift = self.tf_buffer.lookup_transform(
+                'link_arm_l4',
+                'link_lift',
+                rclpy.time.Time()
+            )
+            arm_l4_tf_lift = numpify(tf_to_lift.transform)
+
+            tf_to_mast = self.tf_buffer.lookup_transform(
+                'link_lift',
+                'link_mast',
+                rclpy.time.Time()
+            )        
+            lift_tf_mast = numpify(tf_to_mast.transform)
+
+            tf_to_base = self.tf_buffer.lookup_transform(
+                'link_mast',
+                base_frame,
+                rclpy.time.Time()
+            )
+            mast_tf_base = numpify(tf_to_base.transform)
+
+            # lift to base
+            from_lift_tf = lift_tf_mast @ mast_tf_base
+
+            # l0 to base
+            from_l0_tf = arm_l0_tf_arm_l1 @ arm_l1_tf_arm_l2 @ arm_l2_tf_arm_l3 @ arm_l4_tf_lift @ from_lift_tf
+
+            # from body
+            from_gripper_s3_body = gripper_body_tf_wrist_roll @ wrist_roll_tf_wrist_pitch @ wrist_pitch_tf_wrist_yaw_bottom @ wrist_yaw_bottom_tf_wrist_yaw @ wrist_yaw_tf_arm_l0 @ from_l0_tf
+
+            base_tfs = {
+                'from_lift': from_lift_tf,
+                'from_l0': from_l0_tf,
+                'from_gripper_body': from_gripper_s3_body
+            }        
+
+            return base_tfs
+
+    def get_marker_to_baselink_tf(self, marker_id, base_tfs):
+        marker_tf_body = []
+
+        # base markers -> baselink
+        if id == 130 or id == 131: 
+            tf_to_baselink = self.tf_buffer.lookup_transform(
+                stretch_aruco_ids[marker_id],  # from
+                base_frame,             # target
+                rclpy.time.Time()
+            )
+            marker_tf_body = numpify(tf_to_baselink.transform)
+
+        # shoulder marker -> link lift -> link mast -> baselink
+        elif id == 134:
+            tf_to_lift = self.tf_buffer.lookup_transform(
+                stretch_aruco_ids[marker_id],
+                'link_lift',
+                rclpy.time.Time()
+            )
+            marker_tf_lift = numpify(tf_to_lift.transform)
+            marker_tf_body = marker_tf_lift @ base_tfs['from_lift']
+
+        # wrist markers -> arm l0 -> ... -> arm l4 -> lift -> mast -> baselink
+        elif id == 132 or id == 133:
+            tf_to_l0 = self.tf_buffer.lookup_transform(
+                stretch_aruco_ids[marker_id],
+                'link_arm_l0',
+                rclpy.time.Time()
+            )
+            marker_tf_l0 = numpify(tf_to_l0.transform)
+            marker_tf_body = marker_tf_l0 @ base_tfs['from_l0']
+
+        # gripper cam marker -> gripper body -> roll -> pitch -> yaw bottom -> yaw -> rm l0 -> ... -> arm l4 -> lift -> mast -> baselink
+        elif id == 135:
+            tf_to_gripper_body = self.tf_buffer.lookup_transform(
+                stretch_aruco_ids[id],
+                'link_gripper_s3_body',
+                rclpy.time.Time()
+            )
+            marker_tf_gripper_body = numpify(tf_to_gripper_body.transform)
+            marker_tf_body = marker_tf_gripper_body @ base_tfs['from_gripper_body']
+
+        # left finger marker -> gripper finger left -> -> gripper body -> roll -> pitch -> yaw bottom -> yaw -> rm l0 -> ... -> arm l4 -> lift -> mast -> baselink
+        elif id == 200:
+            tf_to_left_finger = self.tf_buffer.lookup_transform(
+                stretch_aruco_ids[id],
+                'link_gripper_finger_left',
+                rclpy.time.Time()
+            )
+            marker_tf_finger = numpify(tf_to_left_finger.transform)
+            tf_to_gripper_body = self.tf_buffer.lookup_transform(
+                'link_gripper_finger_left',
+                'link_gripper_s3_body',
+                rclpy.time.Time()
+            )            
+            finger_tf_body = numpify(tf_to_gripper_body.transform)
+            marker_tf_body = marker_tf_finger @ finger_tf_body @ base_tfs['from_gripper_body']
+
+        elif id == 201:
+            tf_to_right_finger = self.tf_buffer.lookup_transform(
+                stretch_aruco_ids[id],
+                'link_gripper_finger_right',
+                rclpy.time.Time()
+            )
+            marker_tf_finger = numpify(tf_to_right_finger.transform)
+            tf_to_gripper_body = self.tf_buffer.lookup_transform(
+                'link_gripper_finger_right',
+                'link_gripper_s3_body',
+                rclpy.time.Time()
+            )            
+            finger_tf_body = numpify(tf_to_gripper_body.transform)
+            marker_tf_body = marker_tf_finger @ finger_tf_body @ base_tfs['from_gripper_body']
+        
+        else:
+            print(marker_id)
+
+        return marker_tf_body
+
+    def get_marker_tf(self, marker_id):
+        marker_tf_baselink_mat = []
+
+        if marker_id in stretch_aruco_ids:
+            try:
+                marker_tf_baselink = self.tf_buffer.lookup_transform(
+                    stretch_aruco_ids[marker_id],
+                    base_frame,
+                    rclpy.time.Time()
+                )
+                marker_tf_baselink_mat = numpify(marker_tf_baselink.transform)
+            except TransformException as ex:
+                self.get_logger().info(f'Could not transform {stretch_aruco_ids[marker_id]} to {base_frame}: {ex}')
+        else: 
+            print(marker_id)
+        
+        return marker_tf_baselink_mat
 
     def aruco_callback(self, msg):
-        i = 0
         cam_pose = PoseStamped()
         # pt = PointStamped()
-        marker = PointStamped()
 
-        # cam_pose.header.frame_id = camera_frame # camera frame
-        marker.header.frame_id = base_frame 
-        # cam_pose.header.stamp = self.get_clock().now().to_msg()
-        marker.header.stamp = self.get_clock().now().to_msg()
+        cam_pose.header.frame_id = base_frame
+        cam_pose.header.stamp = self.get_clock().now().to_msg()
 
         pose_list = []
 
         tf_baselink_to_cam = np.array([])
         tf_cam_to_baselink = np.array([])
-        # print('marker pose : \n' + str(msg.poses[0]) + '\n')
-
-        # check for pose detection
-        # if msg.marker_ids == 131 or msg.marker_ids == 130:
-        # check for correct position
-        # if msg.marker_ids == 131:
-        #     marker.point = msg.poses[0].position
-            # print('marker : \n' + str(marker.point) + '\n')
-
-        for id in msg.marker_ids:
-            # position = msg.poses[i].position
-            # orientation = msg.poses[i].orientation
-            # pose = PoseStamped()
-
-            # rot = R.from_quat([orientation.x, orientation.y, orientation.z, orientation.w])
-            # rot_mat = rot.as_matrix()
-
-            # # transform: cam --> aruco (base) markers
-            # tf_cam_to_marker = np.array([
-            #     [rot_mat[0][0], rot_mat[0][1], rot_mat[0][2], position.x],
-            #     [rot_mat[1][0], rot_mat[1][1], rot_mat[1][2], position.y],
-            #     [rot_mat[2][0], rot_mat[2][1], rot_mat[2][2], position.z],
-            #     [0.0, 0.0, 0.0, 1.0]
-            # ])
-
-            # print('cam to marker :\n' + str(tf_cam_to_marker))
-
-            # transform: cam --> base (known fixed transform from tf)
-            # if id == 130:   # base_left
-            #     tf_cam_to_baselink = tf_cam_to_marker @ tf_base_left_to_base_link
-            #     # tf_baselink_to_cam = tf_cam_to_marker * tf_base_left_to_base_link
-
-            #     marker.point.x = tf_cam_to_baselink[0][3]
-            #     marker.point.y = tf_cam_to_baselink[1][3]
-            #     marker.point.z = tf_cam_to_baselink[2][3]
-
-            #     # print('cam to base:\n' + str(tf_cam_to_baselink))
-            # el
-            if id == 131:   # base_right
-                position = msg.poses[i].position
-                orientation = msg.poses[i].orientation
-                pose = PoseStamped()
-
-                rot = R.from_quat([orientation.x, orientation.y, orientation.z, orientation.w])
-                rot_mat = rot.as_matrix()
-
-                # transform: cam --> aruco (base) markers
-                tf_cam_to_marker = np.array([
-                    [rot_mat[0][0], rot_mat[0][1], rot_mat[0][2], position.x],
-                    [rot_mat[1][0], rot_mat[1][1], rot_mat[1][2], position.y],
-                    [rot_mat[2][0], rot_mat[2][1], rot_mat[2][2], position.z],
-                    [0.0, 0.0, 0.0, 1.0]
-                ])
-
-                tf_cam_to_baselink = tf_cam_to_marker @ tf_base_right_to_base_link
-                # tf_baselink_to_cam = tf_cam_to_marker * tf_base_right_to_base_link
-                
-                marker.point.x = tf_cam_to_baselink[0][3]
-                marker.point.y = tf_cam_to_baselink[1][3]
-                marker.point.z = tf_cam_to_baselink[2][3]
-
-                # print('base from right: ' + str(marker.point))
-
-                # transform baselink -> cam == inverse(cam --> baselink)
-                tf_baselink_to_cam = np.linalg.inv(tf_cam_to_baselink)
-
-                self.marker_pub.publish(marker)
-
-                pose.pose.position.x = tf_baselink_to_cam[0][3] # + marker.point.x
-                pose.pose.position.y = tf_baselink_to_cam[1][3] # + marker.point.y
-                pose.pose.position.z = tf_baselink_to_cam[2][3] # + marker.point.z
-
-                baselink_to_cam_rot = np.array([
-                    [tf_baselink_to_cam[0][0], tf_baselink_to_cam[0][1], tf_baselink_to_cam[0][2]],
-                    [tf_baselink_to_cam[1][0], tf_baselink_to_cam[1][1], tf_baselink_to_cam[1][2]],
-                    [tf_baselink_to_cam[2][0], tf_baselink_to_cam[2][1], tf_baselink_to_cam[2][2]]
-                ])
-
-                cam_to_world_rot = np.array([
-                    [0, -1.0, 0],
-                    [0, 0, -1.0],
-                    [1.0, 0, 0]
-                ])
 
 
-                new_rot = R.from_matrix(baselink_to_cam_rot @ cam_to_world_rot)
+        # base_tfs = self.get_base_tf()
 
-                # pose.orientation = orientation
-                pose.pose.orientation.x = (new_rot.as_quat())[0]
-                pose.pose.orientation.y = (new_rot.as_quat())[1]
-                pose.pose.orientation.z = (new_rot.as_quat())[2]
-                pose.pose.orientation.w = (new_rot.as_quat())[3]
+        # use i to match id and pose index
+        for i in range(len(msg.marker_ids)):
+            id = msg.marker_ids[i]
+            marker_pose = msg.poses[i]
+            pose = Pose()
 
-                cam_pose.pose = pose.pose
+            rot = R.from_quat([marker_pose.orientation.x, marker_pose.orientation.y, marker_pose.orientation.z, marker_pose.orientation.w])
+            rot_mat = rot.as_matrix()
 
-                cam_pose.header.frame_id = base_frame
-                cam_pose.header.stamp = self.get_clock().now().to_msg()
-                # if pose_list:
-                    # cam_pose.poses = pose_list
-                    # print('left pose : \n' + str(pose_list[0]) + '\n')
-                    # print('right pose : \n' + str(pose_list[1]) + '\n')
-                
-                # print(cam_pose)
-                self.cam_pose_pub.publish(cam_pose)
-            else:
-                continue
+            # # transform: cam --> aruco marker
+            tf_cam_to_marker = np.array([
+                [rot_mat[0][0], rot_mat[0][1], rot_mat[0][2], marker_pose.position.x],
+                [rot_mat[1][0], rot_mat[1][1], rot_mat[1][2], marker_pose.position.y],
+                [rot_mat[2][0], rot_mat[2][1], rot_mat[2][2], marker_pose.position.z],
+                [0.0, 0.0, 0.0, 1.0]
+            ])
 
-            # transform baselink -> cam == inverse(cam --> baselink)
-            # tf_baselink_to_cam = np.linalg.inv(tf_cam_to_baselink)
+            # get tf marker to baselink
+            tf_marker_to_baselink = self.get_marker_tf(id)
 
-            # self.marker_pub.publish(marker)
+            tf_cam_to_baselink = tf_cam_to_marker @ tf_marker_to_baselink
+            tf_baselink_to_cam = np.linalg.inv(tf_cam_to_baselink)
 
-            # pose.pose.position.x = tf_baselink_to_cam[0][3] # + marker.point.x
-            # pose.pose.position.y = tf_baselink_to_cam[1][3] # + marker.point.y
-            # pose.pose.position.z = tf_baselink_to_cam[2][3] # + marker.point.z
+            pose.position.x = tf_baselink_to_cam[0][3]
+            pose.position.y = tf_baselink_to_cam[1][3]
+            pose.position.z = tf_baselink_to_cam[2][3]
 
-            # new_rot = R.from_matrix([
-            #     [tf_baselink_to_cam[0][0], tf_baselink_to_cam[0][1], tf_baselink_to_cam[0][2]],
-            #     [tf_baselink_to_cam[1][0], tf_baselink_to_cam[1][1], tf_baselink_to_cam[1][2]],
-            #     [tf_baselink_to_cam[2][0], tf_baselink_to_cam[2][1], tf_baselink_to_cam[2][2]]
-            # ])
+            baselink_to_cam_rot = np.array([
+                [tf_baselink_to_cam[0][0], tf_baselink_to_cam[0][1], tf_baselink_to_cam[0][2]],
+                [tf_baselink_to_cam[1][0], tf_baselink_to_cam[1][1], tf_baselink_to_cam[1][2]],
+                [tf_baselink_to_cam[2][0], tf_baselink_to_cam[2][1], tf_baselink_to_cam[2][2]]
+            ])
 
-            # # pose.orientation = orientation
-            # pose.pose.orientation.x = (new_rot.as_quat())[0]
-            # pose.pose.orientation.y = (new_rot.as_quat())[1]
-            # pose.pose.orientation.z = (new_rot.as_quat())[2]
-            # pose.pose.orientation.w = (new_rot.as_quat())[3]
+            # correct camera frame rotation matrix
+            cam_to_world_rot = np.array([
+                [0, -1.0, 0],
+                [0, 0, -1.0],
+                [1.0, 0, 0]
+            ])
 
-            # print('pose :\n' + str(tf_baselink_to_cam))
+            new_rot = R.from_matrix(baselink_to_cam_rot @ cam_to_world_rot)
 
-            # print(str(id) + ': \n' + str(pose) + '\n')pose_list
+            pose.orientation.x = (new_rot.as_quat())[0]
+            pose.orientation.y = (new_rot.as_quat())[1]
+            pose.orientation.z = (new_rot.as_quat())[2]
+            pose.orientation.w = (new_rot.as_quat())[3]
 
-            # pose.pose.orientation.x = orientation.x
-            # pose.pose.orientation.y = orientation.y
-            # pose.pose.orientation.z = orientation.z
-            # pose.pose.orientation.w = orientation.w
+            pose_list.append(pose)
+            
+        # average camera poses from all aruco pose estimations
+        total = Pose()
+        for pose in pose_list:
+            total.position.x += pose.position.x
+            total.position.y += pose.position.y
+            total.position.z += pose.position.z
 
-            # pose_list.append(pose)
+            total.orientation.x += pose.orientation.x
+            total.orientation.y += pose.orientation.y
+            total.orientation.z += pose.orientation.z
+            total.orientation.w += pose.orientation.w
+
+        if pose_list:
+            cam_pose.pose.position.x = total.position.x / len(pose_list)
+            cam_pose.pose.position.y = total.position.y / len(pose_list)
+            cam_pose.pose.position.z = total.position.z / len(pose_list)
+            cam_pose.pose.orientation.x = total.orientation.x / len(pose_list)
+            cam_pose.pose.orientation.y = total.orientation.y / len(pose_list)
+            cam_pose.pose.orientation.z = total.orientation.z / len(pose_list)
+            cam_pose.pose.orientation.w = total.orientation.w / len(pose_list)
+
+            # published calculated average camera position 
+            self.cam_pose_pub.publish(cam_pose)
         
-        # avg_pos = [0.0, 0.0, 0.0]
-        # for pt in pose_list:
-        #     avg_pos[0] += pt.pose.position.x
-        #     avg_pos[1] += pt.pose.position.y
-        #     avg_pos[2] += pt.pose.position.z
-
-        # if pose_list:
-        #     cam_pose = pose_list[0] # get orientation
-        #     cam_pose.pose.position.x = avg_pos[0] / len(pose_list)
-        #     cam_pose.pose.position.y = avg_pos[1] / len(pose_list)
-        #     cam_pose.pose.position.z = avg_pos[2] / len(pose_list)
-        # cam_pose.pose = pose.pose
-
-        # cam_pose.header.frame_id = base_frame
-        # cam_pose.header.stamp = self.get_clock().now().to_msg()
-        # # if pose_list:
-        #     # cam_pose.poses = pose_list
-        #     # print('left pose : \n' + str(pose_list[0]) + '\n')
-        #     # print('right pose : \n' + str(pose_list[1]) + '\n')
-        
-        # # print(cam_pose)
-        # self.cam_pose_pub.publish(cam_pose)
-
 
 def main():
     rclpy.init()

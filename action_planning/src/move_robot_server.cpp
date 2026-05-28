@@ -48,10 +48,10 @@ class ArmActionServer : public rclcpp::Node {
         std::thread([this]() {this->executor_.spin(); }).detach();
 
         // initialize interface; panda arm is the moveit demo robot 
-        arm_group_interface_ = std::make_shared<MoveGroupInterface>(move_group_node_, "panda_arm");
-        gripper_group_interface_ = std::make_shared<MoveGroupInterface>(move_group_node_, "hand");
+        arm_group_interface_ = std::make_shared<MoveGroupInterface>(move_group_node_, "mobile_base_arm");
+        gripper_group_interface_ = std::make_shared<MoveGroupInterface>(move_group_node_, "stretch_gripper");
 
-        gripper_model_group_ = gripper_group_interface_->getCurrentState()->getJointModelGroup("hand");
+        gripper_model_group_ = gripper_group_interface_->getCurrentState()->getJointModelGroup("stretch_gripper");
         current_state_ = gripper_group_interface_->getCurrentState(10);
         current_state_->copyJointGroupPositions(gripper_model_group_, gripper_group_positions_);
 

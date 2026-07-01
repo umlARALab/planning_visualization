@@ -1,10 +1,12 @@
 import rclpy
 from rclpy.node import Node
 
-from geometry_msgs.msg import PoseArray, PointStamped, PoseStamped, Pose
-import numpy as np
-
 from stretch_ar.msg import HitPos
+from geometry_msgs.msg import Transform, PointStamped
+
+import numpy as np
+from scipy.spatial.transform import Rotation as R
+
 
 class ARTransform(Node):
     def __init__(self):
@@ -12,6 +14,8 @@ class ARTransform(Node):
 
         self.unity_tf_stretch = np.array([])
         # self.world_pt_stretch_history = []
+
+        self.unity_tf = Transform()
 
         # subscribe to stretch align point published by quest
         self.aruco_marker_sub = self.create_subscription(
@@ -31,6 +35,7 @@ class ARTransform(Node):
 
         # publish object position relative to stretch
         self.obj_point_pub = self.create_publisher(PointStamped, '/object_position', 10)
+        self.stretch_tf_unity_pub = self.create_publisher(Transform, '/unity_tf', 10)
 
     def stretch_align(self, msg):
         if msg == None:
@@ -45,13 +50,25 @@ class ARTransform(Node):
         unity_v = [1, 0, 0]
 
         # get tf from stretch -> unity
-        stretch_rot_unity = self.get_rotation_matrix(unity_v, stretch_v)
+        unity_rot_stretch = self.get_rotation_matrix(unity_v, stretch_v)
         self.unity_tf_stretch = np.array([
-            [stretch_rot_unity[0][0], stretch_rot_unity[0][1], stretch_rot_unity[0][2], msg.hit_position.x],
-            [stretch_rot_unity[1][0], stretch_rot_unity[1][1], stretch_rot_unity[1][2], msg.hit_position.y],
-            [stretch_rot_unity[2][0], stretch_rot_unity[2][1], stretch_rot_unity[2][2], 0],
+            [unity_rot_stretch[0][0], unity_rot_stretch[0][1], unity_rot_stretch[0][2], msg.hit_position.x],
+            [unity_rot_stretch[1][0], unity_rot_stretch[1][1], unity_rot_stretch[1][2], msg.hit_position.y],
+            [unity_rot_stretch[2][0], unity_rot_stretch[2][1], unity_rot_stretch[2][2], 0],
             [0, 0, 0, 1]
         ])
+
+        # publish tf stretch tf unity to keep track of
+        stretch_tf_unity = np.linalg.inv(self.unity_tf_stretch)
+        self.unity_tf.translation = [stretch_tf_unity[0][4], stretch_tf_unity[1][4], stretch_tf_unity[2][4]]
+        unity_rot = R.from_matrix(np.array(
+            [stretch_tf_unity[0][0], stretch_tf_unity[0][1], stretch_tf_unity[0][2]],
+            [stretch_tf_unity[1][0], stretch_tf_unity[1][1], stretch_tf_unity[1][2]],
+            [stretch_tf_unity[2][0], stretch_tf_unity[2][1], stretch_tf_unity[2][2]],        
+        ))
+        self.unity_tf.rotation = unity_rot.as_quat()
+
+        self.stretch_tf_unity_pub.publish(self.unity_tf)
 
         print('UNITY -> STRETCH')
         print(self.unity_tf_stretch)

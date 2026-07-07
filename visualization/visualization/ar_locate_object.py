@@ -1,29 +1,40 @@
 import rclpy
 from rclpy.node import Node
+from enum import Enum
 
-from geometry_msgs.msg import PointStamped, Pose, Twist
+from geometry_msgs.msg import PointStamped, Pose
+from std_msgs.msg import Bool 
 from nav_msgs.msg import Odometry
 
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 from tf_transformations import euler_from_quaternion
 
+import stretch_body.robot
+
+class State(Enum):
+    IDLE = 0
+    SEARCH = 1
+    PLAN = 2
+    MOVE = 3
+
+# tf from base link to stretch head - Translation: [0.045, -0.003, 1.307]
+base_to_head = [0.045, -0.003, 1.307]
 
 class LocateTarget(Node):
     def __init__(self):
-        super().__init__('locate_object')
+        super().__init__('ar_locate_object')
 
         self.stretch_pose = Pose()
 
         self.target_rotation = []
-        self.target_input = False
+        self.robot_state = State.IDLE
 
-        self.joint_sub = self.create_subscription(
-            Odometry,
-            '/odom', # get stretch odom topic
-            self.odom_callback,
-            10
-        )
+        self.robot = stretch_body.robot.Robot()
+        did_startup = self.robot.startup()
+        self.get_logger().info(f'Robot connected to hardware: {did_startup}')
+        is_homed = self.robot.is_homed()
+        self.get_logger().info(f'Robot is homed: {is_homed}')
 
         # get rough position estimation of target object
         self.obj_estimation_sub = self.create_subscription(
@@ -33,59 +44,80 @@ class LocateTarget(Node):
             10
         )
 
-        self.cmd_pub = self.create_publisher(
-            Twist, 
-            '/stretch/cmd_vel',
+        self.runstop_sub = self.create_subscription(
+            Bool, 
+            '/stop_robot',
+            self.runstop_callback,
             10
         )
 
-    # get current stretch position to turn towards object
-    def odom_callback(self, msg):
-        self.stretch_pose = msg.pose.pose
-        move = Twist()
+        self.odom_pub = self.create_publisher(
+            Pose,
+            '/stretch_odom',
+            10
+        )
 
-        if self.target_input:
-            if self.compare_rotation() == -1:
-                move.angular.z = -0.1
-                self.cmd_pub.publish(move)
-            elif self.compare_rotation() == 1:
-                move.angular.z = 0.1
-                self.cmd_pub.publish(move)
-            else:
-                move.angular.z = 0.0
-                self.cmd_pub.publish(move)
+    def runstop_callback(self, msg):
+        self.get_logger().info(f'STOPPING AND DISCONNECTING FROM ROBOT')
 
+        if msg.data:
+            self.robot.arm.set_velocity(0.0)
+            self.robot.base.set_translate_velocity(0.0)
+            self.robot.base.set_rotational_velocity(0.0)
+            self.robot.head.move_to('head_pan', 0.0, 0.8)
+            self.robot.head.move_to('head_tilt', 0.0, 0.8)
+            
+            self.robot.push_command()
+            self.robot.wait_command()
 
-    def compare_rotation(self):
-        stretch_rot = euler_from_quaternion([self.stretch_pose.orientation.x,
-                                              self.stretch_pose.orientation.y,
-                                              self.stretch_pose.orientation.z,
-                                              self.stretch_pose.orientation.w])
-
-        if np.abs(stretch_rot[2] - self.target_rotation[2]) < 0.1:
-            print('reached target angle')
-            self.target_input = False
-            return 0 # don't move
-        elif self.target_rotation[2] > 0:
-            return 1 # turn left (counter cw)
-        else :
-            return -1 # turn right (clockwise)
-
-
+            self.robot.stop()
+            rclpy.shutdown()
+                
     # turn stretch camera to look at target object position
     def locate_callback(self, msg):
         obj_pt = msg.point
-        self.target_input = True
+        self.robot_state = State.SEARCH
 
+        updateOdom = Pose()
+        updateOdom.position.x = 0.0
+        updateOdom.position.y = 0.0
+        updateOdom.position.z = 0.0
+
+        # measure rotation from stretch to target object
         obj_v = [obj_pt.x, obj_pt.y, 0]
         stretch_v = [1, 0, 0]
 
-        # measure rotation from stretch to target object
         stretch_rot_obj = R.from_matrix(self.get_rotation_matrix(stretch_v, obj_v))
-
         self.target_rotation = stretch_rot_obj.as_euler('xyz')
-        print(self.target_rotation)
+        print(stretch_rot_obj.as_euler('xyz', True))
+        print(stretch_rot_obj.as_quat())
+        print('Base status angle: ' + str(self.robot.base.status['theta']))
 
+        # print(self.robot.base.status['x'])
+        # print(self.robot.base.status['y'])
+        # print(self.robot.base.status['theta'])
+        # print(' ')
+
+        # rotate stretch towards object by z 
+        self.robot.base.rotate_by(self.target_rotation[2])
+        self.robot.push_command()
+        # self.robot.wait_command()
+
+        updateOdom.orientation.x = stretch_rot_obj.as_quat()[0]
+        updateOdom.orientation.y = stretch_rot_obj.as_quat()[1]
+        updateOdom.orientation.z = stretch_rot_obj.as_quat()[2]
+        updateOdom.orientation.w = stretch_rot_obj.as_quat()[3]
+        print(str(updateOdom.orientation))
+        self.odom_pub.publish(updateOdom)
+
+        # measure rotation from stretch camera to target object
+        obj_v = [1, 0, obj_pt.z - base_to_head[2]]
+        cam_rot_obj = R.from_matrix(self.get_rotation_matrix(stretch_v, obj_v))
+        head_tilt_angle = cam_rot_obj.as_euler('xyz')
+
+        self.robot.head.move_to('head_tilt', -head_tilt_angle[1], 0.8)
+        self.robot.push_command()
+        # self.robot.wait_command()
 
     def get_rotation_matrix(self, v1, v2):
         a = (v1 / np.linalg.norm(v1)).reshape(3)
@@ -110,6 +142,7 @@ def main():
     sub = LocateTarget()
     rclpy.spin(sub)
 
+    sub.destroy_node()
     rclpy.shutdown()
 
 if __name__ == '__main__':

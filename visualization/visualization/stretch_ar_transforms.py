@@ -6,7 +6,7 @@ import numpy as np
 from nav_msgs.msg import Odometry
 from scipy.spatial.transform import Rotation as R
 
-
+from stretch_ar.msg import RobotStatus
 from stretch_ar.msg import HitPos
 
 class ARTransform(Node):
@@ -17,6 +17,8 @@ class ARTransform(Node):
         # self.world_pt_stretch_history = []
         self.unity_tf_stretch = np.array([])
         self.stretch_pose = Pose()
+
+        self.status = RobotStatus()
         
         self.stretch_pose.position.x = 0.0
         self.stretch_pose.position.y = 0.0
@@ -51,6 +53,9 @@ class ARTransform(Node):
 
         # publish object position relative to stretch
         self.obj_point_pub = self.create_publisher(PointStamped, '/object_position', 10)
+
+        # publish feedback from robot
+        self.status_pub = self.create_publisher(RobotStatus, '/robot_feedback', 10)
 
     # get current stretch position to turn towards object
     def odom_callback(self, msg):
@@ -118,6 +123,12 @@ class ARTransform(Node):
         ])
         if self.unity_tf_world.size == 0:
             self.unity_tf_world = self.unity_tf_stretch
+
+        # if stretch has initial alignment
+        if self.unity_tf_stretch.size != 0:
+            self.status.data = 'Ready for target'
+            self.status.state = 1
+            self.status_pub.publish(self.status)
 
         # print('UNITY -> STRETCH WORLD')
         # print(self.unity_tf_world)

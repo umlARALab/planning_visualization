@@ -3,7 +3,7 @@ from rclpy.node import Node
 from enum import Enum
 
 from geometry_msgs.msg import PointStamped, Pose
-from std_msgs.msg import Bool 
+from std_msgs.msg import Bool
 from nav_msgs.msg import Odometry
 
 import numpy as np
@@ -11,12 +11,14 @@ from scipy.spatial.transform import Rotation as R
 from tf_transformations import euler_from_quaternion
 
 import stretch_body.robot
+from stretch_ar.msg import RobotStatus
 
 class State(Enum):
-    IDLE = 0
-    SEARCH = 1
-    PLAN = 2
-    MOVE = 3
+    NOT_READY = 0
+    IDLE = 1
+    SEARCH = 2
+    PLAN = 3
+    MOVE = 4
 
 # tf from base link to stretch head - Translation: [0.045, -0.003, 1.307]
 base_to_head = [0.045, -0.003, 1.307]
@@ -28,7 +30,7 @@ class LocateTarget(Node):
         self.stretch_pose = Pose()
 
         self.target_rotation = []
-        self.robot_state = State.IDLE
+        self.robot_state = RobotStatus()
 
         self.robot = stretch_body.robot.Robot()
         did_startup = self.robot.startup()
@@ -51,14 +53,14 @@ class LocateTarget(Node):
             10
         )
 
-        self.odom_pub = self.create_publisher(
-            Pose,
-            '/stretch_odom',
-            10
-        )
+        # make shift odom publisher and status publisher
+        self.odom_pub = self.create_publisher(Pose, '/stretch_odom', 10)
+        self.status_pub = self.create_publisher(RobotStatus, '/robot_feedback', 10)
 
     def runstop_callback(self, msg):
         self.get_logger().info(f'STOPPING AND DISCONNECTING FROM ROBOT')
+        self.robot_state.data = "Stopping and disconnecting"
+        self.robot_state.state = 0
 
         if msg.data:
             self.robot.arm.set_velocity(0.0)
@@ -71,12 +73,15 @@ class LocateTarget(Node):
             self.robot.wait_command()
 
             self.robot.stop()
+
+            self.status_pub.publish(self.status)
             rclpy.shutdown()
                 
     # turn stretch camera to look at target object position
     def locate_callback(self, msg):
         obj_pt = msg.point
-        self.robot_state = State.SEARCH
+        self.robot_state.data = 'Searching for target'
+        self.robot_state.state = 2
 
         updateOdom = Pose()
         updateOdom.position.x = 0.0

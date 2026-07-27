@@ -74,7 +74,6 @@ class ArucoDetect(Node):
         tf_baselink_to_cam = np.array([])
         tf_cam_to_baselink = np.array([])
 
-
         # base_tfs = self.get_base_tf()
 
         # use i to match id and pose index

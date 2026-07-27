@@ -23,13 +23,18 @@ def generate_launch_description():
             name='stretch_ar_transforms',
             output='screen'
         ),
-        Node(
-            package='ros_tcp_endpoint',
-            executable='default_server_endpoint',
-            name='default_server_endpoint',
-            parameters=[{'ROS_TCP_PORT':10000}, {'ROS_IP':'192.168.10.3'}],
-            output='log'
-        )
+        # Node(
+        #     package='visualization',
+        #     executable='ar_camera',
+        #     name='ar_camera'
+        # )
+        # Node(
+        #     package='ros_tcp_endpoint',
+        #     executable='default_server_endpoint',
+        #     name='default_server_endpoint',
+        #     parameters=[{'ROS_TCP_PORT':10000}, {'ROS_IP':'192.168.10.3'}],
+        #     output='log'
+        # )
     ])
 
 # ros2 run ros_tcp_endpoint default_server_endpoint --ros-args -p ROS_IP:=192.168.10.3 -p ROS_TCP_PORT:=10000

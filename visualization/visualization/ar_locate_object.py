@@ -16,9 +16,10 @@ from stretch_ar.msg import RobotStatus
 class State(Enum):
     NOT_READY = 0
     IDLE = 1
-    SEARCH = 2
-    PLAN = 3
-    MOVE = 4
+    ALIGN = 2
+    SEARCH = 3
+    PLAN = 4
+    MOVE = 5
 
 # tf from base link to stretch head - Translation: [0.045, -0.003, 1.307]
 base_to_head = [0.045, -0.003, 1.307]
@@ -58,11 +59,11 @@ class LocateTarget(Node):
         self.status_pub = self.create_publisher(RobotStatus, '/robot_feedback', 10)
 
     def runstop_callback(self, msg):
-        self.get_logger().info(f'STOPPING AND DISCONNECTING FROM ROBOT')
         self.robot_state.data = "Stopping and disconnecting"
         self.robot_state.state = 0
 
         if msg.data:
+            self.get_logger().info(f'STOPPING AND DISCONNECTING FROM ROBOT')
             self.robot.arm.set_velocity(0.0)
             self.robot.base.set_translate_velocity(0.0)
             self.robot.base.set_rotational_velocity(0.0)
@@ -74,14 +75,15 @@ class LocateTarget(Node):
 
             self.robot.stop()
 
-            self.status_pub.publish(self.status)
+            self.status_pub.publish(self.robot_state)
             rclpy.shutdown()
                 
     # turn stretch camera to look at target object position
     def locate_callback(self, msg):
         obj_pt = msg.point
-        self.robot_state.data = 'Searching for target'
+        self.robot_state.data = 'Aligning to target'
         self.robot_state.state = 2
+        self.status_pub.publish(self.robot_state)
 
         updateOdom = Pose()
         updateOdom.position.x = 0.0
@@ -106,7 +108,7 @@ class LocateTarget(Node):
         # rotate stretch towards object by z 
         self.robot.base.rotate_by(self.target_rotation[2])
         self.robot.push_command()
-        # self.robot.wait_command()
+        self.robot.wait_command()
 
         updateOdom.orientation.x = stretch_rot_obj.as_quat()[0]
         updateOdom.orientation.y = stretch_rot_obj.as_quat()[1]
@@ -122,7 +124,11 @@ class LocateTarget(Node):
 
         self.robot.head.move_to('head_tilt', -head_tilt_angle[1], 0.8)
         self.robot.push_command()
-        # self.robot.wait_command()
+        self.robot.wait_command()
+
+        self.robot_state.data = 'Searching for target'
+        self.robot_state.state = 3
+        self.status_pub.publish(self.robot_state)
 
     def get_rotation_matrix(self, v1, v2):
         a = (v1 / np.linalg.norm(v1)).reshape(3)

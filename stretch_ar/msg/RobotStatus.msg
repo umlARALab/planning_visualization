@@ -6,6 +6,7 @@ uint8 state
 
 # NOT_READY = 0
 # IDLE = 1
-# SEARCH = 2
-# PLAN = 3
-# MOVE = 4
+# ALIGN = 2
+# SEARCH = 3
+# PLAN = 4
+# MOVE = 5

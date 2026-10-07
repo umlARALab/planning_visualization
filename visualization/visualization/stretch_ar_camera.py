@@ -5,9 +5,10 @@ import cv2
 from cv_bridge import CvBridge
 import numpy as np
 
-from stretch_ar.msg import ImageTarget
+from stretch_ar.msg import ImageTarget, RobotStatus
 from geometry_msgs.msg import Vector3
 from sensor_msgs.msg import Image
+from stretch_ar.srv import ARCam
 
 class ARCamera(Node):
     def __init__(self):
@@ -29,44 +30,26 @@ class ARCamera(Node):
             10
         )
 
+        self.robot_status = self.create_subscription(
+            RobotStatus,
+            'robot_feedback',
+            self.status_callback,
+            10
+        )
+
+        self.state = 0
         self.target_image = None
+        self.camera_image = None
 
     def quest_cam_callback(self, msg):
         cv_image = self.bridge.imgmsg_to_cv2(msg.image, 'bgr8')
         # cv2.circle(cv_image, (int(msg.position.x), int(msg.position.y)), 5, color=(0, 255, 0), thickness=-1)
         screen_target = np.array((msg.position.x, msg.position.y, msg.position.z))
-        upper = 120
-        lower = 40
 
-        # get canny image to get outlines
-        cv_canny = cv2.addWeighted(cv_image, 1.5, np.zeros(cv_image.shape, cv_image.dtype), 0, 0)
-        cv_canny = cv2.GaussianBlur(cv_canny, (3, 3), 0.6)
-        cv_canny = cv2.Canny(cv_canny, lower, upper)
-        cv_canny = cv2.dilate(cv_canny, (5, 5), iterations=1)
-        contours, hierarchy = cv2.findContours(cv_canny,
-                      cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+        contours = self.get_contours(cv_image)
 
         # go through edges and find target
-        closest_contour = []
-        shortest_distance = None
-        for c in contours:
-            M = cv2.moments(c)
-            if M['m00'] == 0.0:
-                continue
-
-            cX = M["m10"] / M["m00"]
-            cY = M["m01"] / M["m00"]
-
-            centroid = np.array((cX, cY, 0.0))
-
-            distance = np.linalg.norm(screen_target - centroid)
-            if len(closest_contour) == 0: 
-                closest_contour = c
-                shortest_distance = distance
-            else:
-                if distance < shortest_distance:
-                    closest_contour = c
-                    shortest_distance = distance
+        closest_contour, centroid = self.find_blob(screen_target, contours)
 
         # copy image shows contours for debugging and testing purposes
         copy_image = cv_image.copy()
@@ -88,48 +71,66 @@ class ARCamera(Node):
         else:
             image_scale = int(240 / (w + w_padding))
 
-        target_image = cv_image[y:(y+h+(h_padding*2)), x:(x+w+(w_padding*2))]
-        self.target_image = cv2.resize(target_image, None, fx=image_scale, fy=image_scale, interpolation=cv2.INTER_LINEAR)
+        self.target_image = cv_image[y:(y+h+(h_padding*2)), x:(x+w+(w_padding*2))]
+        big_target_image = cv2.resize(self.target_image, None, fx=image_scale, fy=image_scale, interpolation=cv2.INTER_LINEAR)
                 
         # cv2.imshow('Contours', copy_image)
-        cv2.imshow('Target', self.target_image)
+        cv2.imshow('Target', big_target_image)
 
         cv2.waitKey(1)
+
+    def status_callback(self, msg):
+        self.state = msg.state
 
     # this is where we will be performing SIFT
     def camera_callback(self, msg):
         # ensure image exists
-        if self.target_image is None:
-            return
+        if self.state == 2:
+            self.camera_image = msg
 
-        sift = cv2.SIFT_create()
+    # apply edge detection and get outlines of image
+    def get_contours(self, img):
+        upper = 120
+        lower = 40
 
-        # set up images
-        cv_image = self.bridge.imgmsg_to_cv2(msg, 'bgr8')
-        gray_cam = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
-        gray_target = cv2.cvtColor(self.target_image, cv2.COLOR_BGR2GRAY)
+        # get canny image to get outlines
+        cv_canny = cv2.addWeighted(img, 1.5, np.zeros(img.shape, img.dtype), 0, 0)
+        cv_canny = cv2.GaussianBlur(cv_canny, (3, 3), 0.6)
+        cv_canny = cv2.Canny(cv_canny, lower, upper)
+        cv_canny = cv2.dilate(cv_canny, (5, 5), iterations=1)
+        contours, hierarchy = cv2.findContours(cv_canny,
+                      cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 
-        # draw keypoints on image to compare later
-        cam_keys, cam_desc = sift.detectAndCompute(gray_cam, None)
-        target_keys, target_desc = sift.detectAndCompute(gray_target, None)
+        return contours
 
-        cam_key_img = cv_image.copy()
-        target_key_img = self.target_image.copy()
+    # from list of contours find the closest 'blob' to a point
+    def find_blob(self, target_pt, contours):
+        closest_contour = []
+        shortest_distance = None
+        target_centroid = []
 
-        cv2.drawKeypoints(cv_image, cam_keys, cam_key_img, (0, 255, 0))
-        cv2.drawKeypoints(self.target_image, target_keys, target_key_img, (0, 255, 0))
+        for c in contours:
+            M = cv2.moments(c)
+            if M['m00'] == 0.0:
+                continue
 
-        # match keypoints
-        if len(cam_desc) != 0 and len(target_desc) != 0:
-            brute_matcher = cv2.BFMatcher(cv2.NORM_L1, crossCheck=False)
-            matches = brute_matcher.match(cam_desc, target_desc)
-            matches = sorted(matches, key=lambda x: x.distance)
+            cX = M["m10"] / M["m00"]
+            cY = M["m01"] / M["m00"]
 
-        # final = cv2.drawMatches(cv_image, cam_keys, gray_target, target_keys, matches, gray_target, flags=2)
+            centroid = np.array((cX, cY, 0.0))
 
-        cv2.imshow('stretch', cv_image)
-        # cv2.imshow('target keys', target_key_img)
-        cv2.waitKey(1)
+            distance = np.linalg.norm(target_pt - centroid)
+            if len(closest_contour) == 0: 
+                closest_contour = c
+                shortest_distance = distance
+                target_centroid = centroid
+            else:
+                if distance < shortest_distance:
+                    closest_contour = c
+                    shortest_distance = distance
+        
+        return closest_contour, target_centroid
+
 
 def main():
     rclpy.init()

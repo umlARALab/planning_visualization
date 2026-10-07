@@ -18,6 +18,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/HitPos.msg"
   "msg/ImageTarget.msg"
   "msg/RobotStatus.msg"
+  "srv/ARCam.srv"
   DEPENDENCIES geometry_msgs sensor_msgs
 )
 

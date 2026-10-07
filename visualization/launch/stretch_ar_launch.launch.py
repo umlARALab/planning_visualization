@@ -25,9 +25,16 @@ def generate_launch_description():
         ),
         # Node(
         #     package='visualization',
-        #     executable='ar_camera',
-        #     name='ar_camera'
-        # )
+        #     executable='camera_srv',
+        #     name='camera_srv',
+        #     output='screen'
+        # ),
+        # Node(
+        #     package='visualization',
+        #     executable='camera_client',
+        #     name='camera_client',
+        #     output='screen'
+        # ),
         # Node(
         #     package='ros_tcp_endpoint',
         #     executable='default_server_endpoint',
@@ -37,5 +44,5 @@ def generate_launch_description():
         # )
     ])
 
-# ros2 run ros_tcp_endpoint default_server_endpoint --ros-args -p ROS_IP:=192.168.10.3 -p ROS_TCP_PORT:=10000
-#
+# ros2 run ros_tcp_endpoint default_server_endpoint --ros-args -p ROS_IP:=192.168.10.5 -p ROS_TCP_PORT:=10000
+# 

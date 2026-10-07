@@ -26,7 +26,9 @@ setup(
             'stretch_ar_transforms = visualization.stretch_ar_transforms:main',
             'aruco_camera_position = visualization.aruco_camera_position:main',
             'ar_locate_object = visualization.ar_locate_object:main',
-            'ar_camera = visualization.stretch_ar_camera:main'
+            'ar_camera = visualization.stretch_ar_camera:main',
+            'camera_srv = visualization.ar_cam_srv:main',
+            'camera_client = visualization.ar_cam_client:main'
 
         ],
     },

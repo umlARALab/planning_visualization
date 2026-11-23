@@ -5,6 +5,7 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 from stretch_ar.msg import ImageTarget, RobotStatus
+from geometry_msgs.msg import Point
 import numpy as np
 from cv_bridge import CvBridge
 import cv2
@@ -17,6 +18,8 @@ class camera_client(Node):
         self.bridge = CvBridge()
         self.target_image = None
         self.camera_image = None
+        self.depth_image = None
+        self.target = Point()
 
         # camera subscribers
         self.robot_status = self.create_subscription(
@@ -36,6 +39,12 @@ class camera_client(Node):
             '/camera/color/image_raw',
             self.camera_callback,
             10
+        ) 
+        self.stretch_camera_sub = self.create_subscription(
+            Image,
+            '/camera/aligned_depth_to_color/image_raw',
+            self.depth_callback,
+            10
         )
 
         self.state = 0
@@ -52,6 +61,7 @@ class camera_client(Node):
         cv_image = self.bridge.imgmsg_to_cv2(msg.image, desired_encoding='rgb8')
         copy_image = cv_image.copy()
         screen_target = np.array((msg.position.x, msg.position.y, msg.position.z))
+        self.target = Point(x=msg.position.x, y=msg.position.y, z=msg.position.z)
 
         contours = self.get_contours(cv_image)
 
@@ -62,30 +72,12 @@ class camera_client(Node):
         cv2.drawContours(cv_image, contours, -1, (0, 255, 0), 1)
         cv2.drawContours(cv_image, closest_contour, -1, (0, 0, 255), 3)
 
-        # crop the potential target object 
-        box = cv2.boundingRect(closest_contour)
-        x, y, w, h = box
-        w_padding = int(w * 0.25)
-        h_padding = int(h * 0.25)
-        x -= w_padding
-        y -= h_padding
-        image_scale = 1
-
-        # scale cropped image to make it more viewable
-        # if h > w:
-        #     image_scale = int(240 / (h + h_padding))
-        # else:
-        #     image_scale = int(240 / (w + w_padding))
-
-        # target = cv_image[y:(y+h+(h_padding*2)), x:(x+w+(w_padding*2))]
-        # print(target.shape)
-        # self.target_image = self.bridge.cv2_to_imgmsg(target, encoding='bgr8')
+        self.target_point = centroid
         self.target_image = msg.image
-        # big_target_image = cv2.resize(target, None, fx=image_scale, fy=image_scale, interpolation=cv2.INTER_LINEAR)
                 
         # cv2.imshow('Contours', copy_image)
-        cv2.imshow('Target', cv_image)
-        cv2.waitKey(1)
+        # cv2.imshow('Target', cv_image)
+        # cv2.waitKey(1)
 
 
     def camera_callback(self, msg):
@@ -93,6 +85,10 @@ class camera_client(Node):
         if self.state == 2:
             self.camera_image = msg
 
+    def depth_callback(self, msg):
+        # get depth image 
+        if self.state == 2:
+            self.depth_image = msg
 
     def status_callback(self, msg):
         self.state = msg.state
@@ -111,23 +107,41 @@ class camera_client(Node):
 
                 self.status_pub.publish(update_state)
             else:
-                response = self.send_request(self.camera_image, self.target_image)
-
-                cv_sift = self.bridge.imgmsg_to_cv2(response.sift_match)
-                cv2.imshow('SIFT', cv_sift)
-                cv2.waitKey(1)
+                self.get_logger().info('[Client] Sending request to server')
+                response = self.send_request(self.camera_image, self.target_image, self.target)
 
 
-    def send_request(self, cam_img, tar_img):
+    def send_request(self, cam_img, tar_img, targ_pt):
         self.req.camera_view = cam_img
         self.req.img_target = tar_img
+        self.req.target = targ_pt
 
         self.get_logger().info('Client sent request')
         self.future = self.cli.call_async(self.req)
-        rclpy.spin_until_future_complete(self, self.future)
-        self.get_logger().info('Service done')
+        self.future.add_done_callback(self.service_response_callback)
 
-        return self.future.result()
+        # rclpy.spin_until_future_complete(self, self.future)
+        # self.get_logger().info('Service done')
+
+        # return self.future.result()
+
+    def service_response_callback(self, future):
+        try:
+            response = future.result()
+
+            self.get_logger().info('Service response received!')
+
+            cv_sift = self.bridge.imgmsg_to_cv2(response.sift_match)
+
+            self.get_logger().info(
+                f'Object Position at: {response.target_pos}'
+            )
+
+            cv2.imshow('SIFT', cv_sift)
+            cv2.waitKey(1)
+
+        except Exception as e:
+            self.get_logger().error(f'Service call failed: {e}')
 
     # ---------- HELPER FUNCTIONS -----------
     def get_contours(self, img):

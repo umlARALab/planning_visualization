@@ -9,6 +9,8 @@ from scipy.spatial.transform import Rotation as R
 from stretch_ar.msg import RobotStatus
 from stretch_ar.msg import HitPos
 
+# CONNECT UNITY AND STRETCH TF FRAMES AND GET ROUGH POSITION OF TARGET RELATIVE TO STRETCH
+
 class ARTransform(Node):
     def __init__(self):
         super().__init__('ar_transform')

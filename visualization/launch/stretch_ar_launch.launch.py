@@ -45,4 +45,4 @@ def generate_launch_description():
     ])
 
 # ros2 run ros_tcp_endpoint default_server_endpoint --ros-args -p ROS_IP:=192.168.10.5 -p ROS_TCP_PORT:=10000
-# 
+# ros2 run ros_tcp_endpoint default_server_endpoint --ros-args -p ROS_IP:=10.116.28.75 -p ROS_TCP_PORT:=10000
